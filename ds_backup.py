@@ -20,12 +20,13 @@
 import os
 import sha
 import urllib
+import os.path
 import tempfile
 
 import simplejson
-import dbus
+#import dbus
 
-from sugar import env
+#from sugar import env
 
 DS_DBUS_SERVICE = 'org.laptop.sugar.DataStore'
 DS_DBUS_INTERFACE = 'org.laptop.sugar.DataStore'
@@ -36,6 +37,8 @@ class ProtocolVersionError(BackupError): pass
 class RefusedByServerError(BackupError): pass
 class ServerTooBusyError(BackupError): pass
 class TransferError(BackupError): pass
+class NoPriorBackups(BackupError): pass
+class BulkRestoreUnavailable(BackupError): pass
 
 # FIXME: We should not be doing this for every entry. Cannot get JSON to accept
 # the dbus types?
@@ -109,6 +112,19 @@ def find_last_backup(server, xo_serial):
         elif e[1] == 503:
             raise ServerTooBusyError(server)
 
+def find_restore_path(server, xo_serial):
+    try:
+        ret = urllib.urlopen(server + '/restore/%s' % xo_serial).read()
+        if ret == '0':
+            raise NoPriorBackups(server)
+        else:
+            return ret
+    except IOError, e:
+        if e[1] == 500:
+            raise BulkRestoreUnavailable(server)
+        elif e[1] == 503:
+            raise ServerTooBusyError(server)
+
 def new_backup_notify(server, nonce, xo_serial):
     try:
         auth = sha.sha(nonce + xo_serial)
@@ -137,10 +153,24 @@ def _rsync(from_list, from_path, to_path, keyfile, user):
         os.kill(pipe.pid, signal.SIGKILL)
         raise TransferError('rsync error: %s' % pipe.childerr.read())
 
+def _unpack_bulk_backup(restore_index):
+    bus = dbus.SessionBus()
+    obj = bus.get_object(DS_DBUS_SERVICE, DS_DBUS_PATH)
+    datastore = dbus.Interface(obj, DS_DBUS_INTERFACE)
+
+    for line in file(restore_index):
+        props = json.read(line)
+    preview_path = os.path.join('preview', props['uid'])
+    if os.path.exists(preview_path):
+        preview = file(preview_path).read()
+        props['preview'] = dbus.ByteArray(preview_data)
+    props['uid'] = ''
+    datastore.create(props, file_path, transfer_ownership=True)
+
 if __name__ == "__main__":
     SERVER_URL = 'http://127.0.0.1:8080/backup/1'
     XO_SERIAL = 'SHF7000500'
 
-    timestamp, nonce = find_last_backup(SERVER_URL, XO_SERIAL)
+#    timestamp, nonce = find_last_backup(SERVER_URL, XO_SERIAL)
 #    metadata, state, files = write_index_since(timestamp)  # timestamp or 0
     metadata, state, files = ('backup.idx', 'backup-state.idx', 'backup-files.idx')
