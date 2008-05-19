@@ -22,11 +22,16 @@ import sha
 import urllib
 import os.path
 import tempfile
+import time
+import glob
+import popen2
+import signal
 
-import simplejson
-#import dbus
+import json
+import dbus
 
-#from sugar import env
+from sugar import env
+from sugar import profile
 
 DS_DBUS_SERVICE = 'org.laptop.sugar.DataStore'
 DS_DBUS_INTERFACE = 'org.laptop.sugar.DataStore'
@@ -50,55 +55,50 @@ def _sanitize_dbus_dict(dbus_dict):
         base_dict[key] = value
     return base_dict
 
-def _write_metadata_and_files(datastore, timestamp, max_items):
-    ds_dir = env.get_profile_path('datastore')
-    store_dir = os.path.join(ds_dir, 'store')
-    backup_metadata_path = os.path.join(ds_dir, 'backup.idx')
-    backup_list_path = os.path.join(ds_dir, 'backup-files.idx')
-    backup_metadata = open(backup_metadata_path, 'w')
-    backup_list = open(backup_list_path, 'w')
-    external_properties = ['preview']
-    query = {'timestamp': {'start': timestamp, 'end': int(time.time())}}
-    if max_items is not None:
-        query['limit'] = max_items
-    print max_items
-    entries, count = datastore.find(query, [], byte_arrays=True)
-    print 'Writing metadata and file indexes for %d entries.' % len(entries)
-    for entry in entries:
-        for prop in external_properties:
-            if prop in entry:
-                del entry[prop]
-                file_path = os.path.join(store_dir, prop, entry['uid'])
-                if os.path.exists(file_path):
-                    backup_list.write(file_path + '\n')
-        file_path = os.path.join(store_dir, entry['uid'])
-        if os.path.exists(file_path):
-            backup_list.write(file_path + '\n')
-        backup_metadata.write(json.write(_sanitize_dbus_dict(entry))+'\n')
-    backup_metadata.close()
-    backup_list.close()
-    return backup_metadata_path, backup_list_path
+def write_metadata(ds_path):
 
-def _write_state(datastore):
-    ds_dir = env.get_profile_path('datastore')
-    backup_state_path = os.path.join(ds_dir, 'backup.idx')
-    backup_state_file, backup_state_path = \
-            tempfile.mkstemp(suffix='.idx', prefix='backup-state')
-    entries, count = datastore.find({}, ['uid'])
-    print 'Writing current state for %d entries.' % len(entries)
-    for entry in entries:
-        os.write(backup_state_file, entry['uid'] + '\n')
-    os.close(backup_state_file)
-    return backup_state_path
-
-def write_index_since(timestamp, max_items=None):
+    # setup datastore connection
     bus = dbus.SessionBus()
     obj = bus.get_object(DS_DBUS_SERVICE, DS_DBUS_PATH)
     datastore = dbus.Interface(obj, DS_DBUS_INTERFACE)
-    backup_metadata_path, backup_files_path = \
-            _write_metadata_and_files(datastore, timestamp, max_items)
-    backup_state_path = _write_state(datastore)
-    return backup_metadata_path, backup_state_path, backup_files_path
+
+    # name the backup file
+    # and open a tmpfile in the same dir
+    # to ensure an atomic replace
+    md_path = os.path.join(ds_path,
+                           'metadata.json')
+    (md_fd, md_tmppath) = tempfile.mkstemp(suffix='.json',
+                                           prefix='.metadata-',
+                                           dir=ds_path)
+    md_fh = os.fdopen(md_fd, 'w')
+
+    # preview contains binary data we
+    # don't actually want...
+    drop_properties = ['preview']
+
+    query = {}
+    entries, count = datastore.find(query, [], byte_arrays=True)
+    print 'Writing metadata and file indexes for %d entries.' % len(entries)
+    for entry in entries:
+        for prop in drop_properties:
+            if prop in entry:
+                del entry[prop]
+        md_fh.write(json.write(_sanitize_dbus_dict(entry))+'\n')
+    md_fh.close()
+
+    os.rename(md_tmppath, md_path)
+    cleanup_stale_metadata(ds_path)
+
+    return md_path
+
+# If we die during write_metadata()
+# we leave stale tempfiles. Cleanup
+# after success...
+def cleanup_stale_metadata(ds_path):
+    files = glob.glob(os.path.join(ds_path, '.metadata-*.json'))
+    for file in files:
+        os.unlink(file)
+    return files.count;
 
 def find_last_backup(server, xo_serial):
     try:
@@ -135,23 +135,24 @@ def new_backup_notify(server, nonce, xo_serial):
             # Auth not accepted. Shouldn't normally happen.
             raise BackupError(server)
 
-def _rsync(from_list, from_path, to_path, keyfile, user):
+def rsync_to_xs(from_path, to_path, keyfile, user):
+
     ssh = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -i "%s" -l "%s"' \
-           % (user, keyfile)
-    rsync = """/usr/bin/rsync -azP --files-from='%s' -e '%s' '%s'" """ % \
-            (from_path, ssh, from_path, to_path)
-    pipe = popen2.Popen3(rsync_cmd, True)
-    if pipe.poll() != -1:
-        os.kill(pipe.pid, signal.SIGKILL)
-        raise TransferError('rsync error: %s' % pipe.childerr.read())
-    for line in pipe:
-        # Calculate and print progress from rsync file counter
-        match = re.match(r'.*to-check=(\d+)/(\d+)', line)
-        if match:
-            print int((int(match.group(2)) - int(match.group(1))) * 100 / float(total))
-    if pipe.poll() != 0:
-        os.kill(pipe.pid, signal.SIGKILL)
-        raise TransferError('rsync error: %s' % pipe.childerr.read())
+        % (keyfile, user)
+    rsync = """/usr/bin/rsync -az --partial --timeout=160 -e '%s' '%s' '%s' """ % \
+            (ssh, from_path, to_path)
+    print rsync
+    rsync_p = popen2.Popen3(rsync, True)
+
+    # here we could track progress with a
+    # for line in pipe:
+    # (an earlier version had it)
+
+    # TODO: wait returns a 16-bit int, we want the lower
+    # byte of that.
+    rsync_exit = rsync_p.wait()
+    if rsync_exit != 0:
+        raise TransferError('rsync error code %s, message:' % rsync_exit, rsync_p.childerr.read())
 
 def _unpack_bulk_backup(restore_index):
     bus = dbus.SessionBus()
@@ -167,10 +168,32 @@ def _unpack_bulk_backup(restore_index):
     props['uid'] = ''
     datastore.create(props, file_path, transfer_ownership=True)
 
-if __name__ == "__main__":
-    SERVER_URL = 'http://127.0.0.1:8080/backup/1'
-    XO_SERIAL = 'SHF7000500'
+def have_ofw_tree():
+    return os.path.exists('/ofw')
 
-#    timestamp, nonce = find_last_backup(SERVER_URL, XO_SERIAL)
-#    metadata, state, files = write_index_since(timestamp)  # timestamp or 0
-    metadata, state, files = ('backup.idx', 'backup-state.idx', 'backup-files.idx')
+def read_ofw(path):
+    path = os.path.join('/ofw', path)
+    if not os.path.exists(path):
+        return None
+    fh = open(path, 'r')
+    data = fh.read().rstrip('\0\n')
+    fh.close()
+    return data
+
+# if run directly as script
+if __name__ == "__main__":
+
+    backup_url = 'http://schoolserver/backup/1'
+
+    if have_ofw_tree():
+        sn = read_ofw('mfg-data/SN')
+    else:
+        sn = 'SHF00000000'
+
+    ds_path = env.get_profile_path('datastore')
+    pk_path = os.path.join(env.get_profile_path(), 'owner.key')
+
+    # TODO: Check backup server availability
+    # if ping_xs():
+    write_metadata(ds_path)
+    rsync_to_xs(ds_path, 'schoolserver:datastore', pk_path, sn)
