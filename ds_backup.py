@@ -208,3 +208,5 @@ if __name__ == "__main__":
     # if ping_xs():
     write_metadata(ds_path)
     rsync_to_xs(ds_path, 'schoolserver:datastore', pk_path, sn)
+    # this marks success to the controlling script...
+    os.system('touch ~/.sugar/default/ds_backup-done')
