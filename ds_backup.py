@@ -1,5 +1,5 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
-
 # Copyright (C) 2007 Ivan Krstić
 # Copyright (C) 2007 Tomeu Vizoso
 # Copyright (C) 2007 One Laptop per Child
