@@ -25,7 +25,6 @@ import tempfile
 import time
 import glob
 import popen2
-import signal
 import re
 
 import json
@@ -125,16 +124,6 @@ def find_restore_path(server, xo_serial):
         elif e[1] == 503:
             raise ServerTooBusyError(server)
 
-def new_backup_notify(server, nonce, xo_serial):
-    try:
-        auth = sha.sha(nonce + xo_serial)
-        # TODO: add auth header
-        ret = urllib.urlopen(server + '/new/%s' % xo_serial).read()
-    except IOError, e:
-        if e[1] == 403:
-            # Auth not accepted. Shouldn't normally happen.
-            raise BackupError(server)
-
 def rsync_to_xs(from_path, to_path, keyfile, user):
 
     # add a trailing slash to ensure
@@ -145,7 +134,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
 
     ssh = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -i "%s" -l "%s"' \
         % (keyfile, user)
-    rsync = """/usr/bin/rsync -az --partial --delete --timeout=160 -e '%s' '%s' '%s' """ % \
+    rsync = "/usr/bin/rsync -az --partial --delete --timeout=160 -e '%s' '%s' '%s' " % \
             (ssh, from_path, to_path)
     print rsync
     rsync_p = popen2.Popen3(rsync, True)
@@ -154,11 +143,27 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
     # for line in pipe:
     # (an earlier version had it)
 
-    # TODO: wait returns a 16-bit int, we want the lower
+    # wait() returns a DWORD, we want the lower
     # byte of that.
-    rsync_exit = rsync_p.wait()
+    rsync_exit = os.WEXITSTATUS(rsync_p.wait())
     if rsync_exit != 0:
-        raise TransferError('rsync error code %s, message:' % rsync_exit, rsync_p.childerr.read())
+        # TODO: retry a couple ofd times
+        # if rsync_exit is 30 (Timeout in data send/receive)
+        raise TransferError('rsync error code %s, message:'
+                            % rsync_exit, rsync_p.childerr.read())
+
+    # Transfer an empty file marking completion
+    # so the XS can see we are done.
+    tmpfile = tempfile.mkstemp()
+    rsync = ("/usr/bin/rsync --timeout 10 -e '%s' '%s' '%s' "
+             % (ssh, tmpfile[1], to_path+'/.transfer_complete'))
+    rsync_p = popen2.Popen3(rsync, True)
+    rsync_exit = os.WEXITSTATUS(rsync_p.wait())
+    if rsync_exit != 0:
+        # TODO: retry a couple ofd times
+        # if rsync_exit is 30 (Timeout in data send/receive)
+        raise TransferError('rsync error code %s, message:'
+                            % rsync_exit, rsync_p.childerr.read())
 
 def _unpack_bulk_backup(restore_index):
     bus = dbus.SessionBus()
