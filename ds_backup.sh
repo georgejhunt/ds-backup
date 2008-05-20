@@ -16,6 +16,22 @@
 # Author: Martin Langhoff <martin@laptop.org>
 #
 
+# If we have backed up recently, leave it for later. Use
+# -mtime 0 for "today"
+# -mtime -1 for "since yesterday"
+# -mtime -10 for in the last 10 days
+#
+# Using -daystart means that the script is more eager to backup
+# in the morning. Without -daystart, laptops backup "later in the day"
+# everyday, as they only start trying after 24hs...
+#
+# Another tack could be -mmin -1200 (20hs), which could be more stable.
+#
+if [ `find ~/.sugar/default/ds_backup-done -daystart -mtime 0 2>/dev/null` ]
+then
+    exit 0
+fi
+
 if [ -e /sys/class/power_supply/olpc-battery/capacity \
      -a -e /sys/class/power_supply/olpc-ac/online ]
 then
@@ -51,22 +67,6 @@ fi
 if [ $AC_STAT == "0" -a $B_LEVEL -lt 30 ]
 then
 	exit 0
-fi
-
-# If we have backed up recently, leave it for later. Use
-# -mtime 0 for "today"
-# -mtime -1 for "since yesterday"
-# -mtime -10 for in the last 10 days
-#
-# Using -daystart means that the script is more eager to backup
-# in the morning. Without -daystart, laptops backup "later in the day"
-# everyday, as they only start trying after 24hs...
-#
-# Another tack could be -mmin -1200 (20hs), which could be more stable.
-#
-if [ `find ~/.sugar/default/ds_backup-done -daystart -mtime 0 2>/dev/null` ]
-then
-    exit 0
 fi
 
 ##
