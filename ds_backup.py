@@ -50,9 +50,7 @@ class BulkRestoreUnavailable(BackupError): pass
 def _sanitize_dbus_dict(dbus_dict):
     base_dict = {}
     for key, value in dbus_dict.iteritems():
-        key = str(key)
-        value = str(value)
-        base_dict[key] = value
+        base_dict[unicode(key)] = unicode(value)
     return base_dict
 
 def write_metadata(ds_path):
@@ -83,7 +81,8 @@ def write_metadata(ds_path):
         for prop in drop_properties:
             if prop in entry:
                 del entry[prop]
-        md_fh.write(json.write(_sanitize_dbus_dict(entry))+'\n')
+        var = json.write(_sanitize_dbus_dict(entry))+'\n'
+        md_fh.write(var.encode('utf-8'))
     md_fh.close()
 
     os.rename(md_tmppath, md_path)
