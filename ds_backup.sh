@@ -16,6 +16,59 @@
 # Author: Martin Langhoff <martin@laptop.org>
 #
 
+##
+## Are we on a School server network?
+## skip if we aren't!
+## (cannibalised from olpc-netstatus)
+##
+function skip_noschoolnet {
+    eth=''
+    msh=''
+    ipeth=''
+    ipmsh=''
+    for i in `ifconfig|grep HWaddr|grep ^eth|awk '{print $1}'`
+    do
+	ifconfig $i|grep "inet addr" > /dev/null && eth=$i
+    done
+    for i in `ifconfig|grep HWaddr|grep ^msh|awk '{print $1}'`
+    do
+	ifconfig $i 2>&1|grep "inet addr" > /dev/null && msh=$i
+    done
+
+    [ -n "$eth" ] && ipeth=`ifconfig $eth|grep "inet addr"|awk 'BEGIN{FS="addr:"}{print $2}'|awk '{print $1}'`
+    [ -n "$msh" ] && ipmsh=`ifconfig $msh|grep "inet addr"|awk 'BEGIN{FS="addr:"}{print $2}'|awk '{print $1}'`
+    
+    #nameserver
+    dns=''
+    while read line
+    do
+        i=$(echo $line | grep nameserver)
+        if [ ${#i} -ne 0 ]; then dns=${line:11};fi
+    done < <(cat /etc/resolv.conf)
+    echo 'DNS       : '$dns
+    echo ''
+
+    config=''
+    if [ ${#ipeth} -ne 0 ]
+    then
+	echo $ethernet|grep $eth > /dev/null && config="Ethernet"
+	echo $ethernet|grep $eth > /dev/null || config="Access point"
+    elif [ ${#dns} -eq 0 ]
+    then
+	config='Link-local'
+    elif [ "${ipmsh:0:3}" = "169" ]
+    then
+	config='MPP'
+    else config='School server'
+    fi
+    [ ${#ipmsh} -eq 0 ] && [ ! "$config" = "Ethernet" ] && config=""
+
+    if [ "$config" != 'School server' ]
+    then
+	exit;
+    fi
+}
+
 # If we have backed up recently, leave it for later. Use
 # -mtime 0 for "today"
 # -mtime -1 for "since yesterday"
@@ -25,12 +78,20 @@
 # in the morning. Without -daystart, laptops backup "later in the day"
 # everyday, as they only start trying after 24hs...
 #
-# Another tack could be -mmin -1200 (20hs), which could be more stable.
+# Another tack could be -mmin -1200 (20hs), which would perhaps
+# be more stable.
 #
-if [ `find ~/.sugar/default/ds_backup-done -daystart -mtime 0 2>/dev/null` ]
-then
-    exit 0
-fi
+function skip_if_recent {
+    RECENT_CHECK='-daystart -mtime 0'
+    if [ `find ~/.sugar/default/ds_backup-done $RECENT_CHECK 2>/dev/null` ]
+    then
+	exit 0
+    fi
+}
+
+skip_if_recent;
+
+
 
 if [ -e /sys/class/power_supply/olpc-battery/capacity \
      -a -e /sys/class/power_supply/olpc-ac/online ]
@@ -55,7 +116,7 @@ else
 
     # hal reports ac adapter presence as 'true'
     # ... translate...
-    if [ AC_STAT = 'true' ]
+    if [ "$AC_STAT" = 'true' ]
     then
 	AC_STAT=1
     else
@@ -66,14 +127,17 @@ fi
 # If we are on battery, and below 30%, leave it for later
 if [ $AC_STAT == "0" -a $B_LEVEL -lt 30 ]
 then
-	exit 0
+    exit 0
 fi
 
 ##
 ## TODO: 
-## - Test: Can we see the XS?
 ## - Handle being called from NM
-##
+
+#
+# Skip if we are not in a school network
+#
+skip_noschoolnet;
 
 ### Ok, we are going to make a backup
 
@@ -83,11 +147,16 @@ then
     mkdir ~/.sugar/default/lock
 fi
 
-#
+# 
 #  Sleep a random amount, not greater than 20 minutes
 #  We use this to stagger client machines in the 30 minute
 #  slots between cron invocations...
-(sleep $(($RANDOM % 1200));
+#  (yes we need all the parenthesys)
+(sleep $(($RANDOM % 1200)));
+
+# After the sleep, check again. Perhaps something triggered
+# another invokation that got the job done while we slept
+skip_if_recent;
 
 # Execute ds_backup.py from the same
 # directory where we are. Use a flock
