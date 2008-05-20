@@ -58,7 +58,7 @@ fi
 #  Sleep a random amount, not greater than 20 minutes
 #  We use this to stagger client machines in the 30 minute
 #  slots between cron invocations...
-#(sleep $(($RANDOM % 1200));
+(sleep $(($RANDOM % 1200));
 
 # Execute ds_backup.py from the same
 # directory where we are. Use a flock
