@@ -26,6 +26,7 @@ import time
 import glob
 import popen2
 import signal
+import re
 
 import json
 import dbus
@@ -76,13 +77,13 @@ def write_metadata(ds_path):
 
     query = {}
     entries, count = datastore.find(query, [], byte_arrays=True)
-    print 'Writing metadata and file indexes for %d entries.' % len(entries)
+    print 'Writing metadata for %d entries.' % len(entries)
     for entry in entries:
         for prop in drop_properties:
             if prop in entry:
                 del entry[prop]
-        var = json.write(_sanitize_dbus_dict(entry))+'\n'
-        md_fh.write(var.encode('utf-8'))
+        formatted = json.write(_sanitize_dbus_dict(entry))+'\n'
+        md_fh.write(formatted.encode('utf-8'))
     md_fh.close()
 
     os.rename(md_tmppath, md_path)
@@ -136,9 +137,15 @@ def new_backup_notify(server, nonce, xo_serial):
 
 def rsync_to_xs(from_path, to_path, keyfile, user):
 
+    # add a trailing slash to ensure
+    # that we don't generate a subdir
+    # at the remote end. rsync oddities...
+    if not re.compile('/$').search(from_path):
+        from_path = from_path + '/'
+
     ssh = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -i "%s" -l "%s"' \
         % (keyfile, user)
-    rsync = """/usr/bin/rsync -az --partial --timeout=160 -e '%s' '%s' '%s' """ % \
+    rsync = """/usr/bin/rsync -az --partial --delete --timeout=160 -e '%s' '%s' '%s' """ % \
             (ssh, from_path, to_path)
     print rsync
     rsync_p = popen2.Popen3(rsync, True)
