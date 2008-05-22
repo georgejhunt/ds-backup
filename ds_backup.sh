@@ -22,6 +22,14 @@
 ## (cannibalised from olpc-netstatus)
 ##
 function skip_noschoolnet {
+
+    #ethernet
+    ethernet=''
+    for i in `ifconfig|grep HWaddr|awk '{print $1}'`
+    do
+        iwconfig $i 2>&1|grep "no wireless" > /dev/null && ethernet="$i $ethernet"
+    done
+
     eth=''
     msh=''
     ipeth=''
