@@ -107,9 +107,10 @@ skip_ifrecent;
 skip_onlowbatt;
 skip_noschoolnet;
 
-### Ok, we are going to atte,pt a backup
+### Ok, we are going to attempt a backup
 
 # make the lock dir if needed
+# we will keep the (empty) file around
 if [ ! -d ~/.sugar/default/lock ]
 then
     mkdir ~/.sugar/default/lock || exit 1;
@@ -135,8 +136,8 @@ LOCKFILE=~/.sugar/default/lock/ds_backup.run
 flock -n $LOCKFILE `dirname $0 `/ds_backup.py
 EXITCODE=$?
 
-# Clean up the lock - if we can ;-)
-rm $LOCKFILE 2>/dev/null
+# Note: we keep the lockfile around to save
+# NAND cycles.
 
 # Propagate the exit code of the flock/ds_backup invocation
 exit $EXITCODE
