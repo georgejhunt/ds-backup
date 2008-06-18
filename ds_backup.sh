@@ -19,62 +19,23 @@
 ##
 ## Are we on a School server network?
 ## skip if we aren't!
-## (cannibalised from olpc-netstatus)
+##
+## Note: this is simplistic on purpose - as we may be
+##       in one of many network topologies.
 ##
 function skip_noschoolnet {
 
-    #ethernet
-    ethernet=''
-    for i in `ifconfig|grep HWaddr|awk '{print $1}'`
-    do
-        iwconfig $i 2>&1|grep "no wireless" > /dev/null && ethernet="$i $ethernet"
-    done
+    # no DNS, no XS
+    grep -c '^nameserver ' /etc/resolv.conf 1>&/dev/null || exit
 
-    eth=''
-    msh=''
-    ipeth=''
-    ipmsh=''
-    for i in `ifconfig|grep HWaddr|grep ^eth|awk '{print $1}'`
-    do
-	ifconfig $i|grep "inet addr" > /dev/null && eth=$i
-    done
-    for i in `ifconfig|grep HWaddr|grep ^msh|awk '{print $1}'`
-    do
-	ifconfig $i 2>&1|grep "inet addr" > /dev/null && msh=$i
-    done
+    # can't resolve & ping? outta here
+    ping -c1 schoolserver 1>&/dev/null || exit
 
-    [ -n "$eth" ] && ipeth=`ifconfig $eth|grep "inet addr"|awk 'BEGIN{FS="addr:"}{print $2}'|awk '{print $1}'`
-    [ -n "$msh" ] && ipmsh=`ifconfig $msh|grep "inet addr"|awk 'BEGIN{FS="addr:"}{print $2}'|awk '{print $1}'`
-    
-    #nameserver
-    dns=''
-    while read line
-    do
-        i=$(echo $line | grep nameserver)
-        if [ ${#i} -ne 0 ]; then dns=${line:11};fi
-    done < <(cat /etc/resolv.conf)
-    echo 'DNS       : '$dns
-    echo ''
+    # TODO: if we are on a mesh, count the hops to
+    # the MPP - as the MPP will be the XS _or_ will provide
+    # access to it. Only continue to backup if the hopcount
+    # is low...
 
-    config=''
-    if [ ${#ipeth} -ne 0 ]
-    then
-	echo $ethernet|grep $eth > /dev/null && config="Ethernet"
-	echo $ethernet|grep $eth > /dev/null || config="Access point"
-    elif [ ${#dns} -eq 0 ]
-    then
-	config='Link-local'
-    elif [ "${ipmsh:0:3}" = "169" ]
-    then
-	config='MPP'
-    else config='School server'
-    fi
-    [ ${#ipmsh} -eq 0 ] && [ ! "$config" = "Ethernet" ] && config=""
-
-    if [ "$config" != 'School server' ]
-    then
-	exit;
-    fi
 }
 
 # If we have backed up recently, leave it for later. Use
@@ -83,13 +44,12 @@ function skip_noschoolnet {
 # -mtime -10 for in the last 10 days
 #
 # Using -daystart means that the script is more eager to backup
-# in the morning. Without -daystart, laptops backup "later in the day"
-# everyday, as they only start trying after 24hs...
+# from early each day. Without -daystart, backups tend to happen
+# later and later everyday, as they only start trying after 24hs...
 #
-# Another tack could be -mmin -1200 (20hs), which would perhaps
-# be more stable.
+# Another tack could be to try -mmin -1200 (20hs) - 
 #
-function skip_if_recent {
+function skip_ifrecent {
     RECENT_CHECK='-daystart -mtime 0'
     if [ `find ~/.sugar/default/ds_backup-done $RECENT_CHECK 2>/dev/null` ]
     then
@@ -97,62 +57,62 @@ function skip_if_recent {
     fi
 }
 
-skip_if_recent;
 
+# Will skip if we are on low batt
+function skip_onlowbatt {
 
-
-if [ -e /sys/class/power_supply/olpc-battery/capacity \
-     -a -e /sys/class/power_supply/olpc-ac/online ]
-then
-    # OLPC HW
-    B_LEVEL=`cat /sys/class/power_supply/olpc-battery/capacity`
-    AC_STAT=`cat /sys/class/power_supply/olpc-ac/online`
-else
-    # Portable, but 100ms slower on XO-1
-    # Note - we read the 1st battery, and the 1st AC
-    # TODO: Smarter support for >1 battery
-    B_HAL=`hal-find-by-capability --capability battery | head -n1`
-    AC_HAL=`hal-find-by-capability --capability ac_adapter`
-    if [ -z $B_HAL -o -z $AC_HAL ]
+    if [ -e /sys/class/power_supply/olpc-battery/capacity \
+	-a -e /sys/class/power_supply/olpc-ac/online ]
     then
-	# We do expect a battery & AC
-	exit 1;
-    fi
-
-    B_LEVEL=`hal-get-property --udi $B_HAL --key battery.charge_level.percentage`
-    AC_STAT=`hal-get-property --udi $AC_HAL --key ac_adapter.present`
-
-    # hal reports ac adapter presence as 'true'
-    # ... translate...
-    if [ "$AC_STAT" = 'true' ]
-    then
-	AC_STAT=1
+        # OLPC HW
+	B_LEVEL=`cat /sys/class/power_supply/olpc-battery/capacity`
+	AC_STAT=`cat /sys/class/power_supply/olpc-ac/online`
     else
-	AC_STAT=0
+        # Portable, but 100ms slower on XO-1
+        # Note - we read the 1st battery, and the 1st AC
+        # TODO: Smarter support for >1 battery
+	B_HAL=`hal-find-by-capability --capability battery | head -n1`
+	AC_HAL=`hal-find-by-capability --capability ac_adapter`
+	if [ -z $B_HAL -o -z $AC_HAL ]
+	then
+     	    # We do expect a battery & AC
+	    exit 1;
+	fi
+
+	B_LEVEL=`hal-get-property --udi $B_HAL --key battery.charge_level.percentage`
+	AC_STAT=`hal-get-property --udi $AC_HAL --key ac_adapter.present`
+
+        # hal reports ac adapter presence as 'true'
+        # ... translate...
+	if [ "$AC_STAT" = 'true' ]
+	then
+	    AC_STAT=1
+	else
+	    AC_STAT=0
+	fi
     fi
-fi
 
-# If we are on battery, and below 30%, leave it for later
-if [ $AC_STAT == "0" -a $B_LEVEL -lt 30 ]
-then
-    exit 0
-fi
-
+    # If we are on battery, and below 30%, leave it for later
+    if [ $AC_STAT == "0" -a $B_LEVEL -lt 30 ]
+    then
+	exit 0
+    fi
+}
 ##
 ## TODO: 
 ## - Handle being called from NM
 
-#
-# Skip if we are not in a school network
-#
+## These checks are ordered cheapest first
+skip_ifrecent;
+skip_onlowbatt;
 skip_noschoolnet;
 
-### Ok, we are going to make a backup
+### Ok, we are going to atte,pt a backup
 
 # make the lock dir if needed
 if [ ! -d ~/.sugar/default/lock ]
 then
-    mkdir ~/.sugar/default/lock
+    mkdir ~/.sugar/default/lock || exit 1;
 fi
 
 # 
@@ -164,7 +124,7 @@ fi
 
 # After the sleep, check again. Perhaps something triggered
 # another invokation that got the job done while we slept
-skip_if_recent;
+skip_ifrecent;
 
 # Execute ds_backup.py from the same
 # directory where we are. Use a flock
