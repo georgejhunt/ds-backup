@@ -27,15 +27,8 @@ import glob
 import popen2
 import re
 
-import json
-import dbus
-
 from sugar import env
 from sugar import profile
-
-DS_DBUS_SERVICE = 'org.laptop.sugar.DataStore'
-DS_DBUS_INTERFACE = 'org.laptop.sugar.DataStore'
-DS_DBUS_PATH = '/org/laptop/sugar/DataStore'
 
 class BackupError(Exception): pass
 class ProtocolVersionError(BackupError): pass
@@ -44,14 +37,6 @@ class ServerTooBusyError(BackupError): pass
 class TransferError(BackupError): pass
 class NoPriorBackups(BackupError): pass
 class BulkRestoreUnavailable(BackupError): pass
-
-# FIXME: We should not be doing this for every entry. Cannot get JSON to accept
-# the dbus types?
-def _sanitize_dbus_dict(dbus_dict):
-    base_dict = {}
-    for key, value in dbus_dict.iteritems():
-        base_dict[unicode(key)] = unicode(value)
-    return base_dict
 
 def find_last_backup(server, xo_serial):
     try:
@@ -118,20 +103,6 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
         # if rsync_exit is 30 (Timeout in data send/receive)
         raise TransferError('rsync error code %s, message:'
                             % rsync_exit, rsync_p.childerr.read())
-
-def _unpack_bulk_backup(restore_index):
-    bus = dbus.SessionBus()
-    obj = bus.get_object(DS_DBUS_SERVICE, DS_DBUS_PATH)
-    datastore = dbus.Interface(obj, DS_DBUS_INTERFACE)
-
-    for line in file(restore_index):
-        props = json.read(line)
-    preview_path = os.path.join('preview', props['uid'])
-    if os.path.exists(preview_path):
-        preview = file(preview_path).read()
-        props['preview'] = dbus.ByteArray(preview_data)
-    props['uid'] = ''
-    datastore.create(props, file_path, transfer_ownership=True)
 
 def have_ofw_tree():
     return os.path.exists('/ofw')
