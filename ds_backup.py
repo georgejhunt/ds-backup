@@ -53,52 +53,6 @@ def _sanitize_dbus_dict(dbus_dict):
         base_dict[unicode(key)] = unicode(value)
     return base_dict
 
-def write_metadata(ds_path):
-
-    # setup datastore connection
-    bus = dbus.SessionBus()
-    obj = bus.get_object(DS_DBUS_SERVICE, DS_DBUS_PATH)
-    datastore = dbus.Interface(obj, DS_DBUS_INTERFACE)
-
-    # name the backup file
-    # and open a tmpfile in the same dir
-    # to ensure an atomic replace
-    md_path = os.path.join(ds_path,
-                           'metadata.json')
-    (md_fd, md_tmppath) = tempfile.mkstemp(suffix='.json',
-                                           prefix='.metadata-',
-                                           dir=ds_path)
-    md_fh = os.fdopen(md_fd, 'w')
-
-    # preview contains binary data we
-    # don't actually want...
-    drop_properties = ['preview']
-
-    query = {}
-    entries, count = datastore.find(query, [], byte_arrays=True)
-    print 'Writing metadata for %d entries.' % len(entries)
-    for entry in entries:
-        for prop in drop_properties:
-            if prop in entry:
-                del entry[prop]
-        formatted = json.write(_sanitize_dbus_dict(entry))+'\n'
-        md_fh.write(formatted.encode('utf-8'))
-    md_fh.close()
-
-    os.rename(md_tmppath, md_path)
-    cleanup_stale_metadata(ds_path)
-
-    return md_path
-
-# If we die during write_metadata()
-# we leave stale tempfiles. Cleanup
-# after success...
-def cleanup_stale_metadata(ds_path):
-    files = glob.glob(os.path.join(ds_path, '.metadata-*.json'))
-    for file in files:
-        os.unlink(file)
-    return files.count;
-
 def find_last_backup(server, xo_serial):
     try:
         ret = urllib.urlopen(server + '/last/%s' % xo_serial).read()
@@ -147,7 +101,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
     # byte of that.
     rsync_exit = os.WEXITSTATUS(rsync_p.wait())
     if rsync_exit != 0:
-        # TODO: retry a couple ofd times
+        # TODO: retry a couple of times
         # if rsync_exit is 30 (Timeout in data send/receive)
         raise TransferError('rsync error code %s, message:'
                             % rsync_exit, rsync_p.childerr.read())
@@ -206,7 +160,6 @@ if __name__ == "__main__":
 
     # TODO: Check backup server availability
     # if ping_xs():
-    write_metadata(ds_path)
     rsync_to_xs(ds_path, 'schoolserver:datastore', pk_path, sn)
     # this marks success to the controlling script...
     os.system('touch ~/.sugar/default/ds_backup-done')
