@@ -19,7 +19,8 @@
 
 import os
 import sha
-import urllib
+import urllib2
+from urllib2 import URLError, HTTPError
 import os.path
 import tempfile
 import time
@@ -38,30 +39,19 @@ class TransferError(BackupError): pass
 class NoPriorBackups(BackupError): pass
 class BulkRestoreUnavailable(BackupError): pass
 
-def find_last_backup(server, xo_serial):
-    try:
-        ret = urllib.urlopen(server + '/last/%s' % xo_serial).read()
-        return ret.split(',', 1)
-    except IOError, e:
-        if e[1] == 404:
-            raise ProtocolVersionError(server)
-        elif e[1] == 403:
-            raise RefusedByServerError(server)
-        elif e[1] == 503:
-            raise ServerTooBusyError(server)
+def check_server_available(server, xo_serial):
 
-def find_restore_path(server, xo_serial):
     try:
-        ret = urllib.urlopen(server + '/restore/%s' % xo_serial).read()
-        if ret == '0':
-            raise NoPriorBackups(server)
-        else:
-            return ret
-    except IOError, e:
-        if e[1] == 500:
-            raise BulkRestoreUnavailable(server)
-        elif e[1] == 503:
-            raise ServerTooBusyError(server)
+        ret = urllib2.urlopen(server + '/available/%s' % xo_serial).read()
+        return 200
+    except HTTPError, e:
+        # server is there, did not fullfull req
+        #  expect 404, 403, 503 as e[1]
+        return e.code
+    except URLError, e:
+        # log it?
+        # print e.reason
+        return -1
 
 def rsync_to_xs(from_path, to_path, keyfile, user):
 
@@ -71,7 +61,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
     if not re.compile('/$').search(from_path):
         from_path = from_path + '/'
 
-    ssh = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -i "%s" -l "%s"' \
+    ssh = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -o "StrictHostKeyChecking no" -i "%s" -l "%s"' \
         % (keyfile, user)
     rsync = "/usr/bin/rsync -az --partial --delete --timeout=160 -e '%s' '%s' '%s' " % \
             (ssh, from_path, to_path)
@@ -129,8 +119,28 @@ if __name__ == "__main__":
     ds_path = env.get_profile_path('datastore')
     pk_path = os.path.join(env.get_profile_path(), 'owner.key')
 
-    # TODO: Check backup server availability
-    # if ping_xs():
-    rsync_to_xs(ds_path, 'schoolserver:datastore', pk_path, sn)
-    # this marks success to the controlling script...
-    os.system('touch ~/.sugar/default/ds_backup-done')
+    # Check backup server availability.
+    # On 503 ("too busy") apply exponential back-off
+    # over 10 attempts. Combined with the staggered sleep
+    # in ds_backup.sh, this should keep thundering herds
+    # under control. We are also holding a flock to prevent
+    # local races.
+    # With range(1,7) we sleep up to 64 minutes.
+    for n in range(1,7):
+        sstatus = check_server_available(backup_url, sn)
+        if (sstatus == 200):
+            # cleared to run
+            rsync_to_xs(ds_path, 'schoolserver:datastore', pk_path, sn)
+            # this marks success to the controlling script...
+            os.system('touch ~/.sugar/default/ds_backup-done')
+            exit(0)
+        elif (sstatus == 503):
+            # exponenxtial backoff
+            time.sleep(60 * 2**n)
+        elif (sstatus == -1):
+            # could not connect - XS is not there
+            exit(1)
+        else:
+            # 500, 404, 403, or other unexpected value
+            exit(1)
+
