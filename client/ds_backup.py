@@ -83,9 +83,11 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
 
     # Transfer an empty file marking completion
     # so the XS can see we are done.
+    # Note: the dest dir on the XS is watched via
+    # inotify - so we avoid creating tempfiles there.
     tmpfile = tempfile.mkstemp()
-    rsync = ("/usr/bin/rsync --timeout 10 -e '%s' '%s' '%s' "
-             % (ssh, tmpfile[1], to_path+'/.transfer_complete'))
+    rsync = ("/usr/bin/rsync --timeout 10 -T /tmp -e '%s' '%s' '%s' "
+             % (ssh, tmpfile[1], 'schoolserver:/var/lib/ds-backup/completion/'+user))
     rsync_p = popen2.Popen3(rsync, True)
     rsync_exit = os.WEXITSTATUS(rsync_p.wait())
     if rsync_exit != 0:
@@ -130,7 +132,7 @@ if __name__ == "__main__":
         sstatus = check_server_available(backup_url, sn)
         if (sstatus == 200):
             # cleared to run
-            rsync_to_xs(ds_path, 'schoolserver:datastore', pk_path, sn)
+            rsync_to_xs(ds_path, 'schoolserver:datastore-current', pk_path, sn)
             # this marks success to the controlling script...
             os.system('touch ~/.sugar/default/ds_backup-done')
             exit(0)
