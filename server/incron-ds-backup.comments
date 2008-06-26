@@ -1,0 +1,11 @@
+## NOTE: incrond v0.5.5 cannot cope with
+## comments in its "tab" files. So we
+## put them here, until incrontab gets
+## better at this :-)
+
+# We monitor create and move to, because
+# while touch/echo will trigger IN_CREATE,
+# rsync transfers (use the -T flag!) will
+# create the file in a tempdir and then mv
+# it into place. Again: use rsync -T /tmp
+#                     : martin@laptop.org
