@@ -144,5 +144,5 @@ if __name__ == "__main__":
             exit(1)
         else:
             # 500, 404, 403, or other unexpected value
-            exit(1)
+            exit(sstatus)
 
