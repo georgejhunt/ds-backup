@@ -121,7 +121,7 @@ fi
 #  We use this to stagger client machines in the 30 minute
 #  slots between cron invocations...
 #  (yes we need all the parenthesys)
-#(sleep $(($RANDOM % 1200)));
+(sleep $(($RANDOM % 1200)));
 
 # After the sleep, check again. Perhaps something triggered
 # another invokation that got the job done while we slept
