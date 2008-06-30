@@ -45,7 +45,7 @@ if not re.match('\w+$', fname):
 # if the user is not found
 user  = pwd.getpwnam(fname)
 # match with /library/users
-if not re.match(homebasepath, user[5]):
+if not user[5].startswith(homebasepath):
     exit(1)
 # user uid must match file owner uid
 if not (user[3] == os.stat(fpath)[4]):
