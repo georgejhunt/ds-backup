@@ -102,6 +102,10 @@ function skip_onlowbatt {
 ## TODO: 
 ## - Handle being called from NM
 
+# change to homedir
+# rsync does not like being called from elsewhere
+cd ~
+
 ## These checks are ordered cheapest first
 skip_ifrecent;
 skip_onlowbatt;
