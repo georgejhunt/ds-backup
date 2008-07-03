@@ -1,0 +1,43 @@
+Welcome to ds-backup
+====================
+:Author: Michael Stone <michael@laptop.org>
+:Date: July 02, 2008
+
+ds-backup is a GPL-licensed collection of scripts for backing up and restoring
+OLPC DataStore objects and metadata.
+
+It was primarily written by
+
+  Martin Langhoff <martin@laptop.org>
+
+Please consider helping to improve ds-backup by adding features like
+
+    * backup/restore to/from USB mass storage devices
+    * backup/restore individual DS objects
+
+Contributing
+------------
+
+The public fora that we frequent include:
+
+  devel@lists.laptop.org
+  #olpc on irc.freenode.org as 'martin_xsa' and 'm_stone'
+  http://dev.laptop.org, user 'martin.langhoff' and 'mstone'
+
+Source code is available at:
+
+  http://dev.laptop.org/git/users/martin/ds-backup.git           (browse)
+  git://dev.laptop.org/users/martin/ds-backup.git                (clone)
+  git+ssh://$USER@dev.laptop.org/git/users/$USER/ds-backup       (commit)
+
+Since we use a distributed development model, you can send us your work in
+several ways. We are happy to receive:
+
+  1) a link to your clone of the olpc-netutils repository and a summary of what
+     you'd like us to examine in it
+
+  2) an emailed patch, preferably indicating the commit to which the patch
+     should be applied
+
+  3) general comments, questions, and reviews in any medium
+

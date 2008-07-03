@@ -1,0 +1,123 @@
+THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
+SHELL = /bin/bash
+
+help: incr-build
+	@echo "Welcome to m_stone's Fedora-packaging assistant."
+	@echo
+	@echo "Interesting targets:"
+	@echo
+	@echo " snapshot        release"
+	@echo " snapshot-lint   release-lint"
+	@echo " snapshot-deploy release-deploy"
+	@echo
+	@echo "See also:"
+	@echo
+	@echo "    http://dev.laptop.org/git/users/mstone/rpm-packaging"
+	@echo
+
+include ./Makefile.package
+
+# Select build id.
+
+SNAPSHOT   := $(shell date +%Y%m%d)git$(shell git log | head -n1 | awk '{print substr($$2,0,6)}')
+BUILDNO    := $(shell if [ -f "build-no" ]; then cat build-no; else echo 1; fi)
+OLDBUILDNO := $(shell echo '$(BUILDNO) - 1' | bc)
+incr-build:
+	@if [ -f "build-no" ]; then echo "1 + `cat build-no`" | bc > build-new && mv build-new build-no; else echo 1 > build-no; fi
+
+ifeq (,$(findstring snapshot,$(MAKECMDGOALS)))
+  VERSION=$(COMPLETION)
+else
+  VERSION=$(COMPLETION).$(BUILDNO).$(SNAPSHOT)
+endif
+
+NV    = $(PKGNAME)-$(VERSION)
+NVR   = $(PKGNAME)-$(VERSION)-$(RELEASE)
+
+# Files.
+
+BUILDDIR   = $(LOCAL_REPO)/$(NVR)
+SRCDIR     = $(BUILDDIR)/$(NV)
+TARBALL    = $(BUILDDIR)/$(NV).tar.bz2
+SRPM       = $(BUILDDIR)/$(NVR).$(DISTVER).src.rpm
+RPM        = $(BUILDDIR)/$(NVR).$(DISTVER).$(ARCH).rpm
+SPEC       = $(BUILDDIR)/$(PKGNAME).spec
+
+# Build commands.
+
+RPMBUILD = rpmbuild \
+	--define "_sourcedir $(BUILDDIR)" \
+	--define "_builddir $(BUILDDIR)" \
+	--define "_srcrpmdir $(BUILDDIR)" \
+	--define "dist .$(DISTVER)" \
+	--define "$(DIST) 1" \
+
+MOCK = /usr/bin/mock \
+	--define "dist .$(DISTVER)" \
+	--define "$(DIST) 1"
+
+
+# Construction Rules
+
+SEDCONF = sed   -e s:@TARBALL@:$(TARBALL):g \
+		-e s:@RELEASE@:$(RELEASE):g \
+		-e s:@VERSION@:$(VERSION):g \
+		-e s:@PKGNAME@:$(PKGNAME):g \
+		< $< > $@
+
+$(SRCDIR):
+	mkdir -p $@
+
+$(BUILDDIR)/%: %.in
+	echo "builddir $@ $<"
+	$(SEDCONF)
+
+$(SRCDIR)/%: %.in
+	echo "srcdir $@ $<"
+	$(SEDCONF)
+
+$(SRCDIR)/%: %
+	cp -r $< $@
+
+$(TARBALL): $(SRCDIR) $(foreach src,$(SOURCES),$(SRCDIR)/$(src))
+	tar cjf $(TARBALL) -C $(BUILDDIR) $(NV)
+
+$(SRPM): $(SPEC) $(TARBALL)
+	$(RPMBUILD) -bs $(BUILDDIR)/$(PKGNAME).spec
+
+build: $(SRPM)
+	$(MOCK) -r $(BUILDROOT) --uniqueext=`whoami` --resultdir=$(BUILDDIR) --rebuild $(SRPM)
+
+
+# Tags, Signatures, Lint, and Clean
+
+$(TARBALL).asc: $(TARBALL)
+	gpg -ab $<
+
+sign: $(TARBALL).asc
+
+.git/refs/tags/$(NV):
+	git tag -s -m "$(NV)" $(NV)
+
+tag: .git/refs/tags/$(NV)
+
+lint:
+	rpmlint $(wildcard $(BUILDDIR)/*.rpm)
+
+clean:
+	rm -rf $(LOCAL_REPO)
+	mkdir -p $(BUILDDIR)
+
+
+# Snapshot and Release Rules
+
+snapshot-deploy: VERSION=$(COMPLETION).$(OLDBUILDNO).$(SNAPSHOT)
+
+snapshot-lint release-lint: lint
+
+snapshot release: incr-build clean build lint
+
+.PHONY: clean sign tag incr-build snapshot release snapshot-deploy release-deploy snapshot-lint release-lint
+
+
+# vim: set noet ts=8 sw=8 :
