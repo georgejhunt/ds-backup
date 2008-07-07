@@ -1,8 +1,9 @@
 
 PKGNAME     = ds-backup
-COMPLETION  = 0.4
+COMPLETION  = 0.5
 RELEASE     = 1
 SOURCES     = README AUTHORS COPYING Makefile.build client server utils
+
 ARCH        = noarch
 DIST        = olpc
 DISTVER     = olpc3
@@ -16,7 +17,7 @@ release-deploy:
 	scp $(TARBALL).asc 	$(REMOTE_REPO)/SOURCES/
 	scp $(SPEC)    		$(REMOTE_REPO)/SPECS/
 	scp $(SRPM)    		$(REMOTE_REPO)/SRPMS/
-	scp $(RPM)      	$(REMOTE_REPO)/RPMS/
+	scp `find $(LOCAL_REPO)/$(PKGNAME)-$(COMPLETION)-$(RELEASE) -name '*.rpm' -a -not -name '*.src.rpm'` $(REMOTE_REPO)/RPMS/
 
 snapshot-deploy:
 	cp -f $(RPM) ~/public_html/$(PKGNAME).rpm
