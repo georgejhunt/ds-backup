@@ -1,6 +1,6 @@
 
 PKGNAME     = ds-backup
-COMPLETION  = 0.5
+COMPLETION  = 0.6
 RELEASE     = 1
 SOURCES     = README AUTHORS COPYING Makefile.build client server utils
 

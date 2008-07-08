@@ -29,7 +29,7 @@ Requires:       python
 Requires:       rsync
 Requires:       sugar-datastore
 Requires:       sugar
-Requires:       crond
+Requires:       cronie
 
 %package server
 
@@ -40,7 +40,7 @@ Requires:       python
 Requires:       rsync
 Requires:       sugar-datastore
 Requires:       sugar
-Requires:       crond
+Requires:       cronie
 
 %description client
 ds-backup-client is a GPL-licensed collection of scripts for backing up and
@@ -81,5 +81,8 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Mon Jul 06 2008 Michael Stone <michael@laptop.org> - 0.6-1.olpc3
+- Fix dependencies: crond -> cronie.
+
 * Wed Jul 02 2008 Michael Stone <michael@laptop.org> - 0.5-1.olpc3
 - Initial release of this spec.
