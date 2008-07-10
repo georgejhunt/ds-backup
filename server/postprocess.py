@@ -10,6 +10,8 @@
 #
 # (in other words, we expect 2 parameters, dirpath, filename)
 #
+# Author: Martin Langhoff <martin@laptop.org>
+#
 import sys
 import os
 import re
@@ -86,6 +88,34 @@ if (exitcode != 0):
     sys.stderr.write('Cannot cp -al')
     exit(1)
 
+# Set ACLs so that apache can read the homedir
+exitcode = subprocess.call(['setfacl', '-m',
+                            'u:apache:rx', user[5]])
+if (exitcode != 0):
+    sys.stderr.write('setfacl')
+    exit(1)
+
+# To say
+#
+# find user[5]/datastore- + datestamp -type f \
+#   | xargs -n100 setfactl -m u:apache:r
+# find user[5]/datastore- + datestamp -type d \
+#   | xargs -n100 setfactl -m u:apache:rx
+#
+# We say Pythonistically
+#
+psrc  = Popen(['find', user[5]+'/datastore-' + datestamp,
+               '-type', 'f'], stdout=PIPE)
+psink = Popen(['xargs', '-n100', 'setfacl', '-m', 'u:apache:r'],
+              stdin=psrc.stdout,stdout=PIPE)
+psink.communicate()
+
+psrc  = Popen(['find', user[5]+'/datastore-' + datestamp,
+               '-type', 'd'], stdout=PIPE)
+psink = Popen(['xargs', '-n100', 'setfacl', '-m', 'u:apache:rx'],
+              stdin=psrc.stdout,stdout=PIPE)
+psink.communicate()
+
 # Note the -n parameter here. Without it
 # the symlink lands inside the previous
 # target of datastore-last. Oops!
@@ -95,6 +125,5 @@ exitcode = subprocess.call(['ln', '--force', '-sn',
 if (exitcode != 0):
     sys.stderr.write('Cannot ln')
     exit(1)
-
 
 # done
