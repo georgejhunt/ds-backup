@@ -118,10 +118,10 @@ psink.communicate()
 
 # Note the -n parameter here. Without it
 # the symlink lands inside the previous
-# target of datastore-last. Oops!
+# target of datastore-latest. Oops!
 exitcode = subprocess.call(['ln', '--force', '-sn',
                  user[5] + '/datastore-' + datestamp,
-                 user[5] + '/datastore-last'])
+                 user[5] + '/datastore-latest'])
 if (exitcode != 0):
     sys.stderr.write('Cannot ln')
     exit(1)

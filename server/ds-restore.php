@@ -106,12 +106,12 @@ function print_userhomes($userhomes) {
     if ($direntry === '.' || $direntry === '..') {
       continue;
     }
-    $dspath = $homedirbase . '/' . $direntry . '/datastore-last';
+    $dspath = $homedirbase . '/' . $direntry . '/datastore-latest';
 
     if (is_dir($dspath)) {
       // $bn needs Moodle's s()/p() style scaping
       $bn = basename($direntry);
-      echo "<li><a href=\"{$baseurl}/{$direntry}/datastore-last\">"
+      echo "<li><a href=\"{$baseurl}/{$direntry}/datastore-latest\">"
 	. "$bn</a></li>\n";
     }
 
