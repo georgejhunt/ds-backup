@@ -1,0 +1,23 @@
+
+PKGNAME     = ds-backup
+COMPLETION  = 0.6
+RELEASE     = 1
+SOURCES     = README AUTHORS COPYING Makefile.build client server utils
+
+ARCH        = noarch
+DIST        = olpc
+DISTVER     = olpc3
+BUILDROOT   = fedora-9-i386
+
+LOCAL_REPO  = $(shell pwd)/rpms
+REMOTE_REPO = dev.laptop.org:public_html/releases
+
+release-deploy:
+	scp $(TARBALL) 		$(REMOTE_REPO)/SOURCES/
+	scp $(TARBALL).asc 	$(REMOTE_REPO)/SOURCES/
+	scp $(SPEC)    		$(REMOTE_REPO)/SPECS/
+	scp $(SRPM)    		$(REMOTE_REPO)/SRPMS/
+	scp `find $(LOCAL_REPO)/$(PKGNAME)-$(COMPLETION)-$(RELEASE) -name '*.rpm' -a -not -name '*.src.rpm'` $(REMOTE_REPO)/RPMS/
+
+snapshot-deploy:
+	cp -f $(RPM) ~/public_html/$(PKGNAME).rpm
