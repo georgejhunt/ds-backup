@@ -119,11 +119,36 @@ function print_userhomes($userhomes) {
   echo '</ul>';
 }
 
-function print_dsdir($dspath, $dsdir) {
+function print_dsdir($dsbasepath, $dsdir) {
   global $homedirbase, $baseurl;
+
+  $dspath = $dsbasepath.'/store';
 
   echo '<h1>Data Store listing</h1>';
   echo '<ul>';
+
+  $latest = false;
+  if (is_link($dsbasepath)) {
+    $latest = true;
+    $dsbasepath = readlink($dsbasepath);
+  }
+
+  // Extract UTC datestamp
+  // For Later - regex and mktime() lines to get epoch:
+  // '/^datastore-(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2})$/'
+  // $epoch = mktime($match[4], $match[5], $match[2], $match[3], $match[1]);
+  if (!preg_match('/^datastore-(\d{4}-\d{2}-\d{2}_\d{2}:\d{2})$/',
+		  basename($dsbasepath), $match)) {
+    mdie("Malformed datastore directory - " . $dsbasepath);
+  }
+  $timestamp = $match[1];
+  echo "<p>Snapshot taken at $timestamp";
+  if ($latest) {
+    echo "- this is the most recent snapshot taken";
+  }
+  echo '. <a href="';
+  echo $baseurl . dirname($_SERVER['PATH_INFO']);
+  echo '">View all snapshots</a></p>';
 
   while ($direntry = readdir($dsdir)) {
     // we will only look at metadata files,
@@ -185,7 +210,8 @@ if (count($params) === 2) {
   if (!preg_match('/^datastore-/',$params[1])) {
     mdie("Only datastore access is allowed" . $params[1]);
   }
-  $dspath = $homedirbase.'/'.$params[0].'/'.$params[1] . '/store';
+  $dsbasepath = $homedirbase.'/'.$params[0].'/'.$params[1];
+  $dspath = $dsbasepath . '/store';
   if (is_dir($dspath)) {
     if (!($dsdir = opendir($dspath))) {
       mdie("Cannot open $dspath");
@@ -217,7 +243,7 @@ if (count($params) === 2) {
 <?php
 
 if (isset($dsdir)) {
-  print_dsdir($dspath,$dsdir);
+  print_dsdir($dsbasepath,$dsdir);
 } elseif (isset($userhomes)) {
   print_userhomes($userhomes);
 }
