@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Wrapper around ds_backup - will be called in 2 situations
+# Wrapper around ds-backup - will be called in 2 situations
 #
 #  - On cron, every 30 minutes during waking/school hours
 #    If you are calling this from cron, pass 'cron' as
@@ -51,7 +51,7 @@ function skip_noschoolnet {
 #
 function skip_ifrecent {
     RECENT_CHECK='-daystart -mtime 0'
-    if [ `find ~/.sugar/default/ds_backup-done $RECENT_CHECK 2>/dev/null` ]
+    if [ `find ~/.sugar/default/ds-backup-done $RECENT_CHECK 2>/dev/null` ]
     then
 	exit 0
     fi
@@ -131,18 +131,18 @@ fi
 # another invokation that got the job done while we slept
 skip_ifrecent;
 
-# Execute ds_backup.py from the same
+# Execute ds-backup.py from the same
 # directory where we are. Use a flock
 # to prevent concurrent runs. If the
 # flock does not succeed immediately,
 # we quit.
-LOCKFILE=~/.sugar/default/lock/ds_backup.run
-flock -n $LOCKFILE `dirname $0 `/ds_backup.py
+LOCKFILE=~/.sugar/default/lock/ds-backup.run
+flock -n $LOCKFILE `dirname $0 `/ds-backup.py
 EXITCODE=$?
 
 # Note: we keep the lockfile around to save
 # NAND cycles.
 
-# Propagate the exit code of the flock/ds_backup invocation
+# Propagate the exit code of the flock/ds-backup invocation
 exit $EXITCODE
 

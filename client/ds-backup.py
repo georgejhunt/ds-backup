@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # Check backup server availability.
     # On 503 ("too busy") apply exponential back-off
     # over 10 attempts. Combined with the staggered sleep
-    # in ds_backup.sh, this should keep thundering herds
+    # in ds-backup.sh, this should keep thundering herds
     # under control. We are also holding a flock to prevent
     # local races.
     # With range(1,7) we sleep up to 64 minutes.
@@ -134,7 +134,7 @@ if __name__ == "__main__":
             # cleared to run
             rsync_to_xs(ds_path, 'schoolserver:datastore-current', pk_path, sn)
             # this marks success to the controlling script...
-            os.system('touch ~/.sugar/default/ds_backup-done')
+            os.system('touch ~/.sugar/default/ds-backup-done')
             exit(0)
         elif (sstatus == 503):
             # exponenxtial backoff

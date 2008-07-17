@@ -70,9 +70,8 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %doc README COPYING AUTHORS
 %config(noreplace) %{_sysconfdir}/cron.d/ds-backup
-%{_bindir}/ds_backup.py
-%{_bindir}/ds_backup.sh
-%{_bindir}/growdatastore.py
+%{_bindir}/ds-backup.py
+%{_bindir}/ds-backup.sh
 
 %files server
 %defattr(-,root,root,-)
