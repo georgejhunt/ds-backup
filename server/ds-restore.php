@@ -29,6 +29,12 @@ $baseurl = 'http://' . $_SERVER['HTTP_HOST']
 $params = array();
 if (isset($_SERVER['PATH_INFO'])) {
   $params = explode('/', $_SERVER['PATH_INFO']);
+
+  // discard last item if empty (trailing slash)
+  if ('' === $params[count($params)-1]) {
+    array_pop($params);
+  }
+
   array_shift($params); // leading slash means first one is always empty
 }
 
@@ -97,12 +103,12 @@ function make_journal_entry_bundle($dspath, $uid) {
   return $filepath;
 }
 
-function print_userhomes($userhomes) {
+function print_userdirs($userdirs) {
   global $homedirbase, $baseurl;
 
   echo '<h1>User listing</h1>';
   echo '<ul>';
-  while ($direntry = readdir($userhomes)) {
+  while ($direntry = readdir($userdirs)) {
     if ($direntry === '.' || $direntry === '..') {
       continue;
     }
@@ -194,12 +200,43 @@ function print_dsdir($dsbasepath, $dsdir) {
   echo '</ul>';
 }
 
+function print_userhome($userhome, $path) {
+  global $baseurl;
+
+  $uid = basename($path);
+
+  echo '<h1>Snapshot listing for user ' . $uid . '</h1>';
+  echo '<p>Times are in UTC</p>';
+  echo '<ul>';
+
+  // Extract UTC datestamp
+
+
+
+  while ($direntry = readdir($userhome)) {
+
+    if (!is_dir($path.'/'.$direntry)) {
+      continue;
+    }
+
+    if (!preg_match('/^datastore-(\d{4}-\d{2}-\d{2}_\d{2}:\d{2})$/',
+		    $direntry, $match)) {
+      continue;
+    }
+    echo "<li><a href=\"{$baseurl}/{$uid}/{$direntry}\">"
+      . $direntry
+      . "</a></li>\n";
+  }
+  echo '</ul>';
+}
+
+
 ///
 /// "Main"
 ///
 /// Defines globals for use in the Display part
 /// - $dspath
-/// - $userhomes
+/// - $userdirs
 /// - $userhome
 /// - Or will just serve a JED
 ///
@@ -227,10 +264,18 @@ if (count($params) === 2) {
   $fp = fopen($jeb, 'rb');
   fpassthru($fp);
   exit;
+} elseif (count($params) === 1) {
+  $uid = array_pop($params);
+  $userpath = $homedirbase . '/' . $uid;
+  if (is_dir($userpath)) {
+    if (!($userhome= opendir($userpath))) {
+      mdie("Cannot open $userpath");
+    }
+  }
 } else {
-  // this would be read_userhomes()
+  // this would be read_userdirs()
   // if it had any internal vars...
-  if (!($userhomes = opendir($homedirbase))) {
+  if (!($userdirs = opendir($homedirbase))) {
     mdie("Cannot open $homedirbase");
   }
 }
@@ -244,8 +289,10 @@ if (count($params) === 2) {
 
 if (isset($dsdir)) {
   print_dsdir($dsbasepath,$dsdir);
-} elseif (isset($userhomes)) {
-  print_userhomes($userhomes);
+ } elseif (isset($userhome)) {
+   print_userhome($userhome, $userpath);
+} elseif (isset($userdirs)) {
+  print_userdirs($userdirs);
 }
 ?>
 </body>
