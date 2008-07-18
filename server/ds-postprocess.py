@@ -6,7 +6,7 @@
 # drop privileges to the user it will process.
 #
 # The incrond invocation line should be
-# /path/to/dir IN_CREATE /path/to/postprocess.py $@ $#
+# /path/to/dir IN_CREATE /path/to/ds-postprocess.py $@ $#
 #
 # (in other words, we expect 2 parameters, dirpath, filename)
 #
