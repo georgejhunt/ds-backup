@@ -19,7 +19,6 @@ include ./Makefile.package
 
 # Select build id.
 
-SNAPSHOT   := $(shell date +%Y%m%d)git$(shell git log | head -n1 | awk '{print substr($$2,0,6)}')
 BUILDNO    := $(shell if [ -f "build-no" ]; then cat build-no; else echo 1; fi)
 OLDBUILDNO := $(shell echo '$(BUILDNO) - 1' | bc)
 incr-build:
@@ -28,7 +27,7 @@ incr-build:
 ifeq (,$(findstring snapshot,$(MAKECMDGOALS)))
   VERSION=$(COMPLETION)
 else
-  VERSION=$(COMPLETION).$(BUILDNO).$(SNAPSHOT)
+  VERSION=$(COMPLETION).$(BUILDNO)
 endif
 
 NV    = $(PKGNAME)-$(VERSION)
@@ -111,7 +110,7 @@ clean:
 
 # Snapshot and Release Rules
 
-snapshot-deploy: VERSION=$(COMPLETION).$(OLDBUILDNO).$(SNAPSHOT)
+snapshot-deploy: VERSION=$(COMPLETION).$(OLDBUILDNO)
 
 snapshot-lint release-lint: lint
 
