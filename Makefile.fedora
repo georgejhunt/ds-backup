@@ -83,7 +83,7 @@ $(TARBALL): $(SRCDIR) $(foreach src,$(SOURCES),$(SRCDIR)/$(src))
 	tar cjf $(TARBALL) -C $(BUILDDIR) $(NV)
 
 $(SRPM): $(SPEC) $(TARBALL)
-	$(RPMBUILD) -bs $(BUILDDIR)/$(PKGNAME).spec
+	$(RPMBUILD) -bs --nodeps $(BUILDDIR)/$(PKGNAME).spec
 
 build: $(SRPM)
 	$(MOCK) -r $(BUILDROOT) --uniqueext=`whoami` --resultdir=$(BUILDDIR) --rebuild $(SRPM)

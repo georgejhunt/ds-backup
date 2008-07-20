@@ -29,18 +29,21 @@ Requires:       python
 Requires:       rsync
 Requires:       sugar-datastore
 Requires:       sugar
-Requires:       cronie
+Requires:       vixie-cron
 
 %package server
 
 Summary:        OLPC DS backup & restore server
 Group:          Applications/Archiving
 
+Requires:       mod_python
 Requires:       python
 Requires:       rsync
-Requires:       sugar-datastore
-Requires:       sugar
-Requires:       cronie
+Requires:       vixie-cron
+Requires:       incron
+Requires:       php
+Requires:       httpd
+BuildRequires:  httpd
 
 %description client
 ds-backup-client is a GPL-licensed collection of scripts for backing up and
@@ -65,21 +68,34 @@ make -f Makefile.build install DESTDIR=$RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+%post server
+service httpd restart
 
 %files client
 %defattr(-,root,root,-)
 %doc README COPYING AUTHORS
-%config(noreplace) %{_sysconfdir}/cron.d/ds-backup
+%config %{_sysconfdir}/cron.d/ds-backup
 %{_bindir}/ds-backup.py
 %{_bindir}/ds-backup.sh
 
 %files server
 %defattr(-,root,root,-)
 %doc README COPYING AUTHORS
-%{_bindir}/postprocess.py
-
+%config(noreplace) %{_sysconfdir}/httpd/conf.d/050-ds-backup.conf
+# incron will mess up with an rpmsave file
+# so replace inconditionally
+%config %{_sysconfdir}/incron.d/ds-backup.conf
+%{_bindir}/ds-postprocess.py
+/var/www/ds-backup/backup-available.py
+/var/www/ds-backup/ds-restore.php
+%attr(700, apache, apache) %dir %{_localstatedir}/lib/ds-backup/recentclients
+%attr(777, nobody, nobody) %dir %{_localstatedir}/lib/ds-backup/completion
 
 %changelog
+* Fri Jul 18 2008 Martin Langhoff <martin@laptop.org - 0.7-1.olpc3
+- Updated server package, several fixes.
+- Fixed dependencies: cronie->vixie-cron (which cronie provides on F9)
+
 * Mon Jul 06 2008 Michael Stone <michael@laptop.org> - 0.6-1.olpc3
 - Fix dependencies: crond -> cronie.
 

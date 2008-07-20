@@ -2,7 +2,7 @@
 PKGNAME     = ds-backup
 COMPLETION  = 0.6
 RELEASE     = 1
-SOURCES     = README AUTHORS COPYING Makefile.build client server utils
+SOURCES     = README AUTHORS COPYING Makefile.build client server
 
 ARCH        = noarch
 DIST        = olpc
