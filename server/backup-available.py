@@ -20,7 +20,9 @@ def handler(req):
 
     # we need at least a few blocks...
     libstat = os.statvfs(basehomedir);
-    if (libstat[3] < 100 or libstat[6] < 100):
+    usedblockspc = 1 - float(libstat[4])/libstat[2]
+    usedfnodespc = 1 - float(libstat[7])/libstat[5]
+    if (usedblockspc > 0.9 or usedfnodespc > 0.9):
         return apache.HTTP_SERVICE_UNAVAILABLE
 
     # Limit concurrent rsync clients
