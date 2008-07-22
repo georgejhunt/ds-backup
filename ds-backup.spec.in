@@ -82,10 +82,13 @@ service httpd restart
 %defattr(-,root,root,-)
 %doc README COPYING AUTHORS
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/050-ds-backup.conf
+%config(noreplace) %{_sysconfdir}/cron.d/ds-backup-server.conf
 # incron will mess up with an rpmsave file
 # so replace inconditionally
 %config %{_sysconfdir}/incron.d/ds-backup.conf
 %{_bindir}/ds-postprocess.py
+%{_bindir}/ds-cleanup.sh
+%{_bindir}/ds-cleanup.py
 /var/www/ds-backup/backup-available.py
 /var/www/ds-backup/ds-restore.php
 %attr(700, apache, apache) %dir %{_localstatedir}/lib/ds-backup/recentclients
