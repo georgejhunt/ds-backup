@@ -70,6 +70,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %post server
 service httpd condrestart
+chkconfig --level 345 incrond on
 
 %files client
 %defattr(-,root,root,-)
