@@ -63,7 +63,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
 
     ssh = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -o "StrictHostKeyChecking no" -i "%s" -l "%s"' \
         % (keyfile, user)
-    rsync = "/usr/bin/rsync -az --partial --delete --timeout=160 -e '%s' '%s' '%s' " % \
+    rsync = "/usr/bin/rsync -z -rlt --partial --delete --timeout=160 -e '%s' '%s' '%s' " % \
             (ssh, from_path, to_path)
     print rsync
     rsync_p = popen2.Popen3(rsync, True)
@@ -86,7 +86,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
     # Note: the dest dir on the XS is watched via
     # inotify - so we avoid creating tempfiles there.
     tmpfile = tempfile.mkstemp()
-    rsync = ("/usr/bin/rsync --timeout 10 -T /tmp -e '%s' '%s' '%s' "
+    rsync = ("/usr/bin/rsync -a -rlt --timeout 10 -T /tmp -e '%s' '%s' '%s' "
              % (ssh, tmpfile[1], 'schoolserver:/var/lib/ds-backup/completion/'+user))
     rsync_p = popen2.Popen3(rsync, True)
     rsync_exit = os.WEXITSTATUS(rsync_p.wait())
