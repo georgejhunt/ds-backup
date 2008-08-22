@@ -98,21 +98,21 @@ if (exitcode != 0):
 # To say
 #
 # find user[5]/datastore- + datestamp -type f \
-#   | xargs -n100 -no-run-if-empty setfactl -m u:apache:r
+#   | xargs -n100 --no-run-if-empty setfactl -m u:apache:r
 # find user[5]/datastore- + datestamp -type d \
-#   | xargs -n100 -no-run-if-empty setfactl -m u:apache:rx
+#   | xargs -n100 --no-run-if-empty setfactl -m u:apache:rx
 #
 # We say Pythonistically
 #
 psrc  = subprocess.Popen(['find', user[5]+'/datastore-' + datestamp,
                '-type', 'f'], stdout=PIPE)
-psink = subprocess.Popen(['xargs', '-n100', '-no-run-if-empty', 'setfacl', '-m', 'u:apache:r'],
+psink = subprocess.Popen(['xargs', '-n100', '--no-run-if-empty', 'setfacl', '-m', 'u:apache:r'],
               stdin=psrc.stdout,stdout=PIPE)
 psink.communicate()
 
 psrc  = subprocess.Popen(['find', user[5]+'/datastore-' + datestamp,
                '-type', 'd'], stdout=PIPE)
-psink = subprocess.Popen(['xargs', '-n100', '-no-run-if-empty', 'setfacl', '-m', 'u:apache:rx'],
+psink = subprocess.Popen(['xargs', '-n100', '--no-run-if-empty', 'setfacl', '-m', 'u:apache:rx'],
               stdin=psrc.stdout,stdout=PIPE)
 psink.communicate()
 
