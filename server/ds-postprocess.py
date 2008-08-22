@@ -50,7 +50,7 @@ user  = pwd.getpwnam(fname)
 if not user[5].startswith(homebasepath):
     exit(1)
 # user uid must match file owner uid
-if not (user[3] == os.stat(fpath)[4]):
+if not (user[2] == os.stat(fpath)[4]):
     exit(1)
 
 # Checks done -now we drop privs and
