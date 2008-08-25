@@ -86,7 +86,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
     # Note: the dest dir on the XS is watched via
     # inotify - so we avoid creating tempfiles there.
     tmpfile = tempfile.mkstemp()
-    rsync = ("/usr/bin/rsync -a -rlt --timeout 10 -T /tmp -e '%s' '%s' '%s' "
+    rsync = ("/usr/bin/rsync -z -rlt --timeout 10 -T /tmp -e '%s' '%s' '%s' "
              % (ssh, tmpfile[1], 'schoolserver:/var/lib/ds-backup/completion/'+user))
     rsync_p = popen2.Popen3(rsync, True)
     rsync_exit = os.WEXITSTATUS(rsync_p.wait())
