@@ -91,7 +91,6 @@ chkconfig --level 345 incrond on
 %{_bindir}/ds-cleanup.sh
 %{_bindir}/ds-cleanup.py
 /var/www/ds-backup/backup-available.py
-/var/www/ds-backup/ds-restore.php
 %attr(700, apache, apache) %dir %{_localstatedir}/lib/ds-backup/recentclients
 %attr(777, nobody, nobody) %dir %{_localstatedir}/lib/ds-backup/completion
 
