@@ -116,6 +116,14 @@ snapshot-lint release-lint: lint
 
 snapshot release: incr-build clean build lint
 
+publish:
+	scp $(BUILDDIR)/$(PKGNAME)-server-$(VERSION)-$(RELEASE).$(DISTVER).$(ARCH).rpm \
+	    xs-dev.laptop.org:/xsrepos/testing/olpc/7/i386/
+	scp $(SRPM) \
+	    xs-dev.laptop.org:/xsrepos/testing/olpc/7/source/SRPMS/
+	ssh xs-dev.laptop.org sudo createrepo /xsrepos/testing/olpc/7/i386
+
+
 .PHONY: clean sign tag incr-build snapshot release snapshot-deploy release-deploy snapshot-lint release-lint
 
 
