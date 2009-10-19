@@ -118,10 +118,17 @@ snapshot release: incr-build clean build lint
 
 publish:
 	scp $(BUILDDIR)/$(PKGNAME)-server-$(VERSION)-$(RELEASE).$(DISTVER).$(ARCH).rpm \
-	    xs-dev.laptop.org:/xsrepos/testing/olpc/9/i386/
+	    xs-dev.laptop.org:/xsrepos/testing/olpc/11/i586/
 	scp $(SRPM) \
-	    xs-dev.laptop.org:/xsrepos/testing/olpc/9/source/SRPMS/
-	ssh xs-dev.laptop.org sudo createrepo /xsrepos/testing/olpc/9/i386
+	    xs-dev.laptop.org:/xsrepos/testing/olpc/11/source/SRPMS/
+	ssh xs-dev.laptop.org sudo createrepo /xsrepos/testing/olpc/11/i586
+publish-snapshot:
+	scp rpms/$(NVR)/$(PKGNAME)-server-$(VERSION)-$(RELEASE).$(DISTVER).$(ARCH).rpm \
+	    xs-dev.laptop.org:/xsrepos/testing/olpc/11/i586/
+	scp $(SRPM) \
+	    xs-dev.laptop.org:/xsrepos/testing/olpc/11/source/SRPMS/
+	ssh xs-dev.laptop.org sudo createrepo /xsrepos/testing/olpc/11/i586
+
 
 
 .PHONY: clean sign tag incr-build snapshot release snapshot-deploy release-deploy snapshot-lint release-lint

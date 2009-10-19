@@ -7,7 +7,7 @@ SOURCES     = README AUTHORS COPYING Makefile.build client server
 ARCH        = noarch
 DIST        = olpc
 DISTVER     = olpc3
-BUILDROOT   = fedora-9-i386
+BUILDROOT   = fedora-11-i386
 
 LOCAL_REPO  = $(shell pwd)/rpms
 REMOTE_REPO = dev.laptop.org:public_html/releases
