@@ -17,16 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-import os
-import sha
+import os, re, sys, tempfile, glob, time
 import urllib2
 from urllib2 import URLError, HTTPError
-import os.path
-import tempfile
-import time
-import glob
 import popen2
-import re
+import subprocess
+from subprocess import Popen, PIPE
 
 from sugar import env
 from sugar import profile
@@ -102,15 +98,21 @@ def get_sn():
     if have_ofw_tree():
         return read_ofw('mfg-data/SN')
     try:
-        import gconf
-        conf = gconf.client_get_default()
         # returns empty str if unset
-        sn = conf.get_string('/desktop/sugar/soas_serial')
+        sn = gconf_get_string('/desktop/sugar/soas_serial')
     except:
         pass
     if not sn: # gconf may return ''
         sn = 'SHF00000000'
     return sn
+
+def gconf_get_string(key):
+    """We cannot use python gconf from cron scripts,
+    but cli gconftool-2 does the trick.
+    Will throw subprocess.Popen exceptions"""
+    value = Popen(['gconftool-2', '-g', key],
+                  stdout=PIPE).communicate()[0]
+    return value
 
 def have_ofw_tree():
     return os.path.exists('/ofw')
@@ -137,11 +139,7 @@ if __name__ == "__main__":
     ## rsync cmd to go to username@fqdn:datastore-current
     ## -- so we only read the FQDN from the value.
     try: # gconf sugar
-        import gconf
-        conf = gconf.client_get_default()
-        # returns empty if unset
-        backup_url = conf.get_string('/desktop/sugar/backup_url')
-        #backup_url = Popen(['gconftool-2', '-g', '/desktop/sugar/backup_url']).communicate()[0]
+        backup_url = gconf_get_string('/desktop/sugar/backup_url')
     except:
         pass
     if not backup_url:
