@@ -156,7 +156,7 @@ if __name__ == "__main__":
 
     if not backup_url:
         # not registered, nothing to do!
-        exit
+        exit(0)
 
     # matches the host part in
     # - user@host:path
