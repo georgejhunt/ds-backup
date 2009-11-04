@@ -28,8 +28,25 @@ function skip_noschoolnet {
     # no DNS, no XS
     grep -c '^nameserver ' /etc/resolv.conf 1>&/dev/null || exit
 
+    # In modern Sugar, use the backup_url saved from registration when in an SoaS
+    BACKUP_HOST=`gconftool-2  -g /desktop/sugar/backup_url 2>/dev/null | sed 's/^.*@//;s/:.*//'`
+    if [ -z "$BACKUP_HOST" ]; then
+	if [ -e ~/.sugar/default/config ]; then
+	    # this catches Sugar pre-gconf - assume
+	    # 'schoolserver'
+	    BACKUP_HOST='schoolserver'
+	    if ! grep -q ^backup1 ~/.sugar/default/config ;then
+		# old sugar, not yet registered
+		exit 0
+	    fi
+	else
+	    # gconf sugar, not yet registered
+	    exit 0
+	fi
+    fi
+    
     # can't resolve & ping? outta here
-    ping -c1 schoolserver 1>&/dev/null || exit
+    ping -c1 $BACKUP_HOST 1>&/dev/null || exit
 
     # TODO: if we are on a mesh, count the hops to
     # the MPP - as the MPP will be the XS _or_ will provide
