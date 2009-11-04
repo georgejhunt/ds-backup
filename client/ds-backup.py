@@ -98,6 +98,20 @@ def rsync_to_xs(from_path, backup_host, keyfile, user):
         raise TransferError('rsync error code %s, message:'
                             % rsync_exit, rsync_p.childerr.read())
 
+def get_sn():
+    if have_ofw_tree():
+        return read_ofw('mfg-data/SN')
+    try:
+        import gconf
+        conf = gconf.client_get_default()
+        # returns empty str if unset
+        sn = conf.get_string('/desktop/sugar/soas_serial')
+    except:
+        pass
+    if not sn: # gconf may return ''
+        sn = 'SHF00000000'
+    return sn
+
 def have_ofw_tree():
     return os.path.exists('/ofw')
 
@@ -155,10 +169,7 @@ if __name__ == "__main__":
 
     backup_ctrl_url = 'http://' + backup_host + '/backup/1'
 
-    if have_ofw_tree():
-        sn = read_ofw('mfg-data/SN')
-    else:
-        sn = 'SHF00000000'
+    sn = get_sn()
 
     ds_path = env.get_profile_path('datastore')
     pk_path = os.path.join(env.get_profile_path(), 'owner.key')
