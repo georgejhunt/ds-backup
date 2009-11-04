@@ -53,7 +53,9 @@ def check_server_available(server, xo_serial):
         # print e.reason
         return -1
 
-def rsync_to_xs(from_path, to_path, keyfile, user):
+def rsync_to_xs(from_path, backup_host, keyfile, user):
+
+    to_path = backup_host + ':datastore-current'
 
     # add a trailing slash to ensure
     # that we don't generate a subdir
@@ -65,7 +67,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
         % (keyfile, user)
     rsync = "/usr/bin/rsync -z -rlt --partial --delete --timeout=160 -e '%s' '%s' '%s' " % \
             (ssh, from_path, to_path)
-    print rsync
+    #print rsync
     rsync_p = popen2.Popen3(rsync, True)
 
     # here we could track progress with a
@@ -87,7 +89,7 @@ def rsync_to_xs(from_path, to_path, keyfile, user):
     # inotify - so we avoid creating tempfiles there.
     tmpfile = tempfile.mkstemp()
     rsync = ("/usr/bin/rsync -z -rlt --timeout 10 -T /tmp -e '%s' '%s' '%s' "
-             % (ssh, tmpfile[1], 'schoolserver:/var/lib/ds-backup/completion/'+user))
+             % (ssh, tmpfile[1], backup_host + ':/var/lib/ds-backup/completion/'+user))
     rsync_p = popen2.Popen3(rsync, True)
     rsync_exit = os.WEXITSTATUS(rsync_p.wait())
     if rsync_exit != 0:
@@ -111,7 +113,47 @@ def read_ofw(path):
 # if run directly as script
 if __name__ == "__main__":
 
-    backup_url = 'http://schoolserver/backup/1'
+    backup_host = '' # host
+    backup_url = ''  # target rsync url - set at reg time
+    backup_ctrl_url = '' # http address for control proto
+
+    ## idmgr (on XS 0.6 and earlier)
+    ## sets backup_url at regtime to
+    ## username@fqdn:backup - but expects the
+    ## rsync cmd to go to username@fqdn:datastore-current
+    ## -- so we only read the FQDN from the value.
+    try: # gconf sugar
+        import gconf
+        conf = gconf.client_get_default()
+        # returns empty if unset
+        backup_url = conf.get_string('/desktop/sugar/backup_url')
+        #backup_url = Popen(['gconftool-2', '-g', '/desktop/sugar/backup_url']).communicate()[0]
+    except:
+        pass
+    if not backup_url:
+        try: # pre-gconf
+            from iniparse import INIConfig
+            conf = INIConfig(open(os.path.expanduser('~')+'/.sugar/default/config'))
+            # this access mode throws an exception if the value
+            # does not exist
+            backup_url = conf['Server']['backup1']
+        except:
+            pass
+
+    if not backup_url:
+        # not registered, nothing to do!
+        exit
+
+    # matches the host part in
+    # - user@host:path
+    # - host:path
+    m = re.match('(\w+\@)?(\w|.+?):', backup_url)
+    if not m or not m.group(2):
+        sys.stderr.write("Cannot extract backup host from %s\n" % backup_url)
+        exit(1)
+    backup_host = m.group(2)
+
+    backup_ctrl_url = 'http://' + backup_host + '/backup/1'
 
     if have_ofw_tree():
         sn = read_ofw('mfg-data/SN')
@@ -129,10 +171,10 @@ if __name__ == "__main__":
     # local races.
     # With range(1,7) we sleep up to 64 minutes.
     for n in range(1,7):
-        sstatus = check_server_available(backup_url, sn)
+        sstatus = check_server_available(backup_ctrl_url, sn)
         if (sstatus == 200):
             # cleared to run
-            rsync_to_xs(ds_path, 'schoolserver:datastore-current', pk_path, sn)
+            rsync_to_xs(ds_path, backup_host, pk_path, sn)
             # this marks success to the controlling script...
             os.system('touch ~/.sugar/default/ds-backup-done')
             exit(0)
