@@ -20,9 +20,8 @@
 import os, re, sys, tempfile, glob, time
 import urllib2
 from urllib2 import URLError, HTTPError
-import popen2
 import subprocess
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, call
 
 from sugar import env
 from sugar import profile
@@ -59,40 +58,41 @@ def rsync_to_xs(from_path, backup_host, keyfile, user):
     if not re.compile('/$').search(from_path):
         from_path = from_path + '/'
 
-    ssh = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -o "StrictHostKeyChecking no" -i "%s" -l "%s"' \
+    ssh_shellcmd = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -o "StrictHostKeyChecking no" -i "%s" -l "%s"' \
         % (keyfile, user)
-    rsync = "/usr/bin/rsync -z -rlt --partial --delete --timeout=160 -e '%s' '%s' '%s' " % \
-            (ssh, from_path, to_path)
+    rsync_cmd = ['/usr/bin/rsync', '-z', '-rlt', '--partial',
+             '--delete', '--timeout=160',
+             '-e', ssh_shellcmd, from_path, to_path]
     #print rsync
-    rsync_p = popen2.Popen3(rsync, True)
 
-    # here we could track progress with a
+    rsync_exit = call(rsync_cmd)
+
+    # TODO: we could track progress with a
     # for line in pipe:
     # (an earlier version had it)
 
-    # wait() returns a DWORD, we want the lower
-    # byte of that.
-    rsync_exit = os.WEXITSTATUS(rsync_p.wait())
     if rsync_exit != 0:
         # TODO: retry a couple of times
         # if rsync_exit is 30 (Timeout in data send/receive)
-        raise TransferError('rsync error code %s, message:'
-                            % rsync_exit, rsync_p.childerr.read())
+        raise TransferError('rsync error code %s'
+                            % rsync_exit)
 
     # Transfer an empty file marking completion
     # so the XS can see we are done.
     # Note: the dest dir on the XS is watched via
     # inotify - so we avoid creating tempfiles there.
     tmpfile = tempfile.mkstemp()
-    rsync = ("/usr/bin/rsync -z -rlt --timeout 10 -T /tmp -e '%s' '%s' '%s' "
-             % (ssh, tmpfile[1], backup_host + ':/var/lib/ds-backup/completion/'+user))
-    rsync_p = popen2.Popen3(rsync, True)
-    rsync_exit = os.WEXITSTATUS(rsync_p.wait())
+    rsync_cmd = ['/usr/bin/rsync', '-z',
+                 '-rlt', '--timeout', '10',
+                 '-T', '/tmp', '-e', ssh_shellcmd,
+                 tmpfile[1],
+                 backup_host + ':/var/lib/ds-backup/completion/'+user]
+    rsync_exit = call(rsync_cmd)
     if rsync_exit != 0:
-        # TODO: retry a couple ofd times
+        # TODO: retry a couple of times
         # if rsync_exit is 30 (Timeout in data send/receive)
-        raise TransferError('rsync error code %s, message:'
-                            % rsync_exit, rsync_p.childerr.read())
+        raise TransferError('rsync error code %s.'
+                            % rsync_exit)
 
 def get_sn():
     if have_ofw_tree():
