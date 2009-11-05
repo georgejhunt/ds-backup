@@ -119,6 +119,9 @@ function skip_onlowbatt {
 ## TODO: 
 ## - Handle being called from NM
 
+MYFULLPATH=`readlink -f $0`
+BASEDIR=`dirname "$MYFULLPATH"`
+
 # change to homedir
 # rsync does not like being called from elsewhere
 cd ~
@@ -156,7 +159,8 @@ skip_ifrecent;
 # flock does not succeed immediately,
 # we quit.
 LOCKFILE=~/.sugar/default/lock/ds-backup.run
-flock -n $LOCKFILE `dirname $0 `/ds-backup.py
+
+flock -n $LOCKFILE "$BASEDIR"/ds-backup.py
 EXITCODE=$?
 
 # Note: we keep the lockfile around to save
