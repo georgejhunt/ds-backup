@@ -97,22 +97,58 @@ def rsync_to_xs(from_path, backup_host, keyfile, user):
 def get_sn():
     if have_ofw_tree():
         return read_ofw('mfg-data/SN')
-    try:
-        # returns empty str if unset
-        sn = gconf_get_string('/desktop/sugar/soas_serial')
+    # on SoaS try gconf, 'identifiers'
+    sn = gconf_get_string('/desktop/sugar/soas_serial')
+    if sn:
+        return sn
+    sn = identifier_get_string('sn')
+    if sn:
+        return sn
+
+    return 'SHF00000000'
+
+def get_backup_url():
+
+    bu = gconf_get_string('/desktop/sugar/backup_url')
+    if bu:
+        return bu
+    try: # pre-gconf
+        from iniparse import INIConfig
+        conf = INIConfig(open(os.path.expanduser('~')+'/.sugar/default/config'))
+        # this access mode throws an exception if the value
+        # does not exist
+        bu = conf['Server']['backup1']
     except:
         pass
-    if not sn: # gconf may return ''
-        sn = 'SHF00000000'
-    return sn
+    if bu:
+        return bu
+    bu = identifier_get_string('backup_url')
+    if bu:
+        return bu
+    return ''
 
 def gconf_get_string(key):
     """We cannot use python gconf from cron scripts,
     but cli gconftool-2 does the trick.
     Will throw subprocess.Popen exceptions"""
-    value = Popen(['gconftool-2', '-g', key],
-                  stdout=PIPE).communicate()[0]
-    return value
+    try:
+        value = Popen(['gconftool-2', '-g', key],
+                      stdout=PIPE).communicate()[0]
+        return value
+    except:
+        return ''
+
+def identifier_get_string(key):
+    """This is a config method used by some versions of
+    Sugar -- in use in some SoaS"""
+    try:
+        fpath = os.path.expanduser('~')+'/.sugar/default/identifier/'+key
+        fh    = open(fpath, 'r')
+        value = fh.read().rstrip('\0\n')
+        fh.close()
+        return value
+    except:
+        return ''
 
 def have_ofw_tree():
     return os.path.exists('/ofw')
@@ -138,22 +174,12 @@ if __name__ == "__main__":
     ## username@fqdn:backup - but expects the
     ## rsync cmd to go to username@fqdn:datastore-current
     ## -- so we only read the FQDN from the value.
-    try: # gconf sugar
-        backup_url = gconf_get_string('/desktop/sugar/backup_url')
-    except:
-        pass
-    if not backup_url:
-        try: # pre-gconf
-            from iniparse import INIConfig
-            conf = INIConfig(open(os.path.expanduser('~')+'/.sugar/default/config'))
-            # this access mode throws an exception if the value
-            # does not exist
-            backup_url = conf['Server']['backup1']
-        except:
-            pass
+
+    backup_url = get_backup_url()
 
     if not backup_url:
         # not registered, nothing to do!
+        # (normally caught in ds-backup.sh)
         exit(0)
 
     # matches the host part in

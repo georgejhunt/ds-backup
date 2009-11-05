@@ -30,21 +30,21 @@ function skip_noschoolnet {
 
     # In modern Sugar, use the backup_url saved from registration when in an SoaS
     BACKUP_HOST=`gconftool-2  -g /desktop/sugar/backup_url 2>/dev/null | sed 's/^.*@//;s/:.*//'`
-    if [ -z "$BACKUP_HOST" ]; then
-	if [ -e ~/.sugar/default/config ]; then
-	    # this catches Sugar pre-gconf - assume
-	    # 'schoolserver'
+    if [ -z "$BACKUP_HOST" -a -e ~/.sugar/default/config ]; then
+	# this catches Sugar pre-gconf - assume
+	# 'schoolserver'
+	if grep -q ^backup1 ~/.sugar/default/config ;then
 	    BACKUP_HOST='schoolserver'
-	    if ! grep -q ^backup1 ~/.sugar/default/config ;then
-		# old sugar, not yet registered
-		exit 0
-	    fi
-	else
-	    # gconf sugar, not yet registered
-	    exit 0
 	fi
     fi
-    
+    if [ -z "$BACKUP_HOST" -a -e ~/.sugar/default/identifiers/backup_url ]; then
+	BACKUP_HOST=`cat ~/.sugar/default/identifiers/backup_url | sed 's/^.*@//;s/:.*//'`
+    fi
+    if [ -z "$BACKUP_HOST" ]; then
+	echo Not registered yet, nothing to do 1>&2
+	exit 0
+    fi
+
     # can't resolve & ping? outta here
     ping -c1 $BACKUP_HOST 1>&/dev/null || exit
 
