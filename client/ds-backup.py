@@ -142,7 +142,7 @@ def identifier_get_string(key):
     """This is a config method used by some versions of
     Sugar -- in use in some SoaS"""
     try:
-        fpath = os.path.expanduser('~')+'/.sugar/default/identifier/'+key
+        fpath = os.path.expanduser('~')+'/.sugar/default/identifiers/'+key
         fh    = open(fpath, 'r')
         value = fh.read().rstrip('\0\n')
         fh.close()
