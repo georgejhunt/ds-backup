@@ -1,16 +1,17 @@
-Name:           @PKGNAME@
-Version:        @VERSION@
-Release:        @RELEASE@%{?dist}
+Name:           ds-backup
+Version:        xx
+Release:        1%{?dist}
 
 Summary:        OLPC DS backup & restore scripts
 Group:          Applications/Archiving
 License:        GPLv2
 URL:            http://wiki.laptop.org/go/Ds-backup
-Source0:        http://dev.laptop.org/~releases/mstone/SOURCES/%{name}-%{version}.tar.bz2
+Source0:        http://dev.laptop.org/git/users/martin/%{name}.git/snapshot/%{name}-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildArch:      noarch
 BuildRequires:  make
+BuildRequires:  python
 
 %description
 ds-backup is a GPL-licensed collection of scripts for backing up and restoring
@@ -62,7 +63,7 @@ restoring OLPC DataStore objects and metadata.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make -f Makefile.build install DESTDIR=$RPM_BUILD_ROOT
+make -f Makefile install DESTDIR=$RPM_BUILD_ROOT
 
 
 %clean
@@ -70,7 +71,6 @@ rm -rf $RPM_BUILD_ROOT
 
 %post server
 service httpd condrestart
-chkconfig --level 345 incrond on
 
 %files client
 %defattr(-,root,root,-)
