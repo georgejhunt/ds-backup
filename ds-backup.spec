@@ -37,6 +37,7 @@ Requires:       vixie-cron
 Summary:        OLPC DS backup & restore server
 Group:          Applications/Archiving
 
+Requires:       xs-config
 Requires:       mod_python
 Requires:       python
 Requires:       rsync
@@ -44,7 +45,6 @@ Requires:       vixie-cron
 Requires:       incron
 Requires:       php
 Requires:       httpd
-BuildRequires:  httpd
 
 %description client
 ds-backup-client is a GPL-licensed collection of scripts for backing up and
@@ -82,15 +82,12 @@ service httpd condrestart
 %files server
 %defattr(-,root,root,-)
 %doc README COPYING AUTHORS
-%config(noreplace) %{_sysconfdir}/httpd/conf.d/050-ds-backup.conf
-%config(noreplace) %{_sysconfdir}/cron.d/ds-backup-server.conf
-# incron will mess up with an rpmsave file
-# so replace inconditionally
-%config %{_sysconfdir}/incron.d/ds-backup.conf
+%{_datadir}/%{name}
+%{_sysconfdir}/sysconfig/olpc-scripts/setup.d/*
 %{_bindir}/ds-postprocess.py
 %{_bindir}/ds-cleanup.sh
 %{_bindir}/ds-cleanup.py
-/var/www/ds-backup/backup-available.py
+/var/www/ds-backup/*
 %attr(700, apache, apache) %dir %{_localstatedir}/lib/ds-backup/recentclients
 %attr(777, nobody, nobody) %dir %{_localstatedir}/lib/ds-backup/completion
 
