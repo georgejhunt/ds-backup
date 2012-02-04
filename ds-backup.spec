@@ -45,6 +45,7 @@ Requires:       vixie-cron
 Requires:       incron
 Requires:       php
 Requires:       httpd
+Requires:       syck-python
 
 %description client
 ds-backup-client is a GPL-licensed collection of scripts for backing up and
