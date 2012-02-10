@@ -151,16 +151,17 @@ def identifier_get_string(key):
         return ''
 
 def have_ofw_tree():
-    return os.path.exists('/ofw')
+    return os.path.exists('/proc/device-tree') or os.path.exists('/ofw')
 
-def read_ofw(path):
-    path = os.path.join('/ofw', path)
-    if not os.path.exists(path):
-        return None
-    fh = open(path, 'r')
-    data = fh.read().rstrip('\0\n')
-    fh.close()
-    return data
+def read_ofw(node):
+    for prefix in ('/proc/device-tree', '/ofw'):
+        path = os.path.join(prefix, node)
+        if os.path.exists(path):
+            fh = open(path, 'r')
+            data = fh.read().rstrip('\0\n')
+            fh.close()
+            return data
+    return None
 
 # if run directly as script
 if __name__ == "__main__":
