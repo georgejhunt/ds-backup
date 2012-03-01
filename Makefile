@@ -1,3 +1,17 @@
+# CANONICAL SOURCE OF VERSION STRING:
+VERSION_MAJOR=0
+VERSION_MINOR=12
+PACKAGE=ds-backup
+PKGVER=$(PACKAGE)-$(VERSION_MAJOR).$(VERSION_MINOR)
+
+tarball: $(PKGVER).tar.bz2
+
+$(PKGVER).tar.bz2:
+	git diff --shortstat --exit-code # check that our working copy is clean
+	git diff --cached --shortstat --exit-code # uncommitted changes?
+	git archive --format=tar --prefix=$(PKGVER)/ HEAD | bzip2 > $@
+.PHONY: $(PKGVER).tar.bz2 # force refresh
+
 # install targets
 
 install: install-client install-server
