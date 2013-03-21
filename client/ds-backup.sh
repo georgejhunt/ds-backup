@@ -64,7 +64,7 @@ function skip_noschoolnet {
 # from early each day. Without -daystart, backups tend to happen
 # later and later everyday, as they only start trying after 24hs...
 #
-# Another tack could be to try -mmin -1200 (20hs) - 
+# Another tack could be to try -mmin -1200 (20hs) -
 #
 function skip_ifrecent {
     RECENT_CHECK='-daystart -mtime 0'
@@ -116,7 +116,7 @@ function skip_onlowbatt {
     fi
 }
 ##
-## TODO: 
+## TODO:
 ## - Handle being called from NM
 
 MYFULLPATH=`readlink -f $0`
@@ -140,7 +140,7 @@ then
     mkdir ~/.sugar/default/lock || exit 1;
 fi
 
-# 
+#
 #  Sleep a random amount, not greater than 20 minutes
 #  We use this to stagger client machines in the 30 minute
 #  slots between cron invocations...
