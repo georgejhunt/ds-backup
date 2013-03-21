@@ -23,6 +23,7 @@ from urllib2 import URLError, HTTPError
 import subprocess
 from subprocess import Popen, PIPE, call
 
+import logging
 from sugar import env
 from sugar import profile
 
@@ -48,34 +49,38 @@ def check_server_available(server, xo_serial):
         # print e.reason
         return -1
 
-def rsync_to_xs(from_path, backup_host, keyfile, user):
+def rsync_to_xs(paths, backup_host, keyfile, user):
 
-    to_path = backup_host + ':datastore-current'
+    # paths is list of tuples (from_path,to_path)
+    for path in paths:
 
-    # add a trailing slash to ensure
-    # that we don't generate a subdir
-    # at the remote end. rsync oddities...
-    if not re.compile('/$').search(from_path):
-        from_path = from_path + '/'
+	to_path = backup_host + ':' + path[1]
+	from_path = path[0]
 
-    ssh_shellcmd = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -o "StrictHostKeyChecking no" -i "%s" -l "%s"' \
-        % (keyfile, user)
-    rsync_cmd = ['/usr/bin/rsync', '-z', '-rlt', '--partial',
-             '--delete', '--timeout=160',
-             '-e', ssh_shellcmd, from_path, to_path]
-    #print rsync
+	# add a trailing slash to ensure
+	# that we don't generate a subdir
+	# at the remote end. rsync oddities...
+	if not re.compile('/$').search(from_path):
+	    from_path = from_path + '/'
 
-    rsync_exit = call(rsync_cmd)
+	ssh_shellcmd = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -o "StrictHostKeyChecking no" -i "%s" -l "%s"' \
+	    % (keyfile, user)
+	rsync_cmd = ['/usr/bin/rsync', '-z', '-rlt', '--partial',
+		'--delete', '--timeout=160',
+		'-e', ssh_shellcmd, from_path, to_path]
+	#print rsync_cmd
 
-    # TODO: we could track progress with a
-    # for line in pipe:
-    # (an earlier version had it)
+	rsync_exit = call(rsync_cmd)
 
-    if rsync_exit != 0:
-        # TODO: retry a couple of times
-        # if rsync_exit is 30 (Timeout in data send/receive)
-        raise TransferError('rsync error code %s'
-                            % rsync_exit)
+	# TODO: we could track progress with a
+	# for line in pipe:
+	# (an earlier version had it)
+
+	if rsync_exit != 0:
+	    # TODO: retry a couple of times
+	    # if rsync_exit is 30 (Timeout in data send/receive)
+	    raise TransferError('rsync error code %s : cmd = "%s"'
+				% (rsync_exit,rsync_cmd) )
 
     # Transfer an empty file marking completion
     # so the XS can see we are done.
@@ -163,6 +168,27 @@ def read_ofw(node):
             return data
     return None
 
+def get_documents_path():
+    """Gets the path of the DOCUMENTS folder
+
+    If xdg-user-dir can not find the DOCUMENTS folder it returns
+    $HOME, which we omit. xdg-user-dir handles localization
+    (i.e. translation) of the filenames.
+
+    Returns: Path to $HOME/DOCUMENTS or None if an error occurs
+    """
+    try:
+        pipe = subprocess.Popen(['xdg-user-dir', 'DOCUMENTS'],
+                                stdout=subprocess.PIPE)
+        documents_path = os.path.normpath(pipe.communicate()[0].strip())
+        if os.path.exists(documents_path) and \
+                os.environ.get('HOME') != documents_path:
+            return documents_path
+    except OSError, exception:
+        if exception.errno != errno.ENOENT:
+            logging.exception('Could not run xdg-user-dir')
+    return None
+
 # if run directly as script
 if __name__ == "__main__":
 
@@ -206,11 +232,27 @@ if __name__ == "__main__":
     # under control. We are also holding a flock to prevent
     # local races.
     # With range(1,7) we sleep up to 64 minutes.
+
+    # Get the documents path in a localization independent way
+    documents_path = get_documents_path()
+    home_path = os.path.expanduser('~')
+
+    # Make sure home_path ends in a /
+    if not re.compile('/$').search(home_path):
+	    home_path += '/'
+
+    backup_paths = [ (ds_path,'datastore-current'), (home_path+'power-logs','power-logs') ]
+
+    # Keep the server side of the documents dir called 'documents' so its standardized
+    # the client should know what its documents dir is localized to
+    if documents_path:
+	backup_paths.append( (documents_path,'documents') )
+
     for n in range(1,7):
         sstatus = check_server_available(backup_ctrl_url, sn)
         if (sstatus == 200):
             # cleared to run
-            rsync_to_xs(ds_path, backup_host, pk_path, sn)
+            rsync_to_xs(backup_paths, backup_host, pk_path, sn)
             # this marks success to the controlling script...
             os.system('touch ~/.sugar/default/ds-backup-done')
             exit(0)
