@@ -46,7 +46,12 @@ function skip_noschoolnet {
     fi
 
     # can't resolve & ping? outta here
-    ping -c1 $BACKUP_HOST 1>&/dev/null || exit
+    # OS release 12.1 and 13.1 dropped suid from ping so we try to run it with
+    # root privs as sudo. If a root password has been set sudo will fail as well
+    # in 13.2 suid root was restored to ping. So try both combinations
+    sudo -n ping -c1 $BACKUP_HOST >/dev/null || \
+	ping -c1 $BACKUP_HOST >/dev/null || \
+	exit
 
     # TODO: if we are on a mesh, count the hops to
     # the MPP - as the MPP will be the XS _or_ will provide
