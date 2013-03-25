@@ -20,8 +20,9 @@ install-client:
 	install -D -d $(DESTDIR)/usr/bin
 	install -D client/ds-backup.py $(DESTDIR)/usr/bin/
 	install -D client/ds-backup.sh $(DESTDIR)/usr/bin/
-	install -D -d $(DESTDIR)/etc
-	install -D -m 644 client/cron-ds-backup.conf $(DESTDIR)/etc/cron.d/ds-backup
+	install -D -d $(DESTDIR)/lib/systemd/system
+	install -D -m 644 client/ds-backup.timer $(DESTDIR)/lib/systemd/system/
+	install -D -m 644 client/ds-backup.service $(DESTDIR)/lib/systemd/system/
 
 install-server:
 	install -D -d $(DESTDIR)/usr/bin

@@ -18,7 +18,7 @@ ds-backup is a GPL-licensed collection of scripts for backing up and restoring
 OLPC DataStore objects and metadata.
 
 # - Dependencies of the client package are rsync, sugar-datastore,
-# sugar, crond, and the python libs sha, urllib2. Everything else I
+# sugar, and the python libs sha, urllib2. Everything else I
 # think is pulled in by standard base or python-base
 
 %package client
@@ -30,7 +30,9 @@ Requires:       python
 Requires:       rsync
 Requires:       sugar-datastore
 Requires:       sugar
-Requires:       vixie-cron
+Requires(post): systemd
+Requires(preun): systemd
+Requires(postun): systemd
 
 %package server
 
@@ -73,10 +75,19 @@ rm -rf $RPM_BUILD_ROOT
 %post server
 service httpd condrestart
 
+%post client
+%systemd_post ds-backup.timer
+
+%preun client
+%systemd_preun ds-backup.timer
+
+%postun client
+%systemd_postun ds-backup.timer
+
 %files client
 %defattr(-,root,root,-)
 %doc README COPYING AUTHORS
-%config %{_sysconfdir}/cron.d/ds-backup
+%{_unitdir}/*
 %{_bindir}/ds-backup.py
 %{_bindir}/ds-backup.sh
 

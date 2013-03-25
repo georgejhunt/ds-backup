@@ -1,0 +1,10 @@
+# systemd unit file
+# intended to be invoked by a corresponding timer file
+
+[Unit]
+Description=datastore backup
+
+[Service]
+ExecStart=/usr/bin/ds-backup.sh
+IOSchedulingClass=idle
+User=olpc
