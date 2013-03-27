@@ -83,36 +83,12 @@ function skip_ifrecent {
 # Will skip if we are on low batt
 function skip_onlowbatt {
 
-    if [ -e /sys/class/power_supply/olpc-battery/capacity \
-	-a -e /sys/class/power_supply/olpc-ac/online ]
-    then
-        # OLPC HW
-	B_LEVEL=`cat /sys/class/power_supply/olpc-battery/capacity`
-	AC_STAT=`cat /sys/class/power_supply/olpc-ac/online`
-    else
-        # Portable, but 100ms slower on XO-1
-        # Note - we read the 1st battery, and the 1st AC
-        # TODO: Smarter support for >1 battery
-	B_HAL=`hal-find-by-capability --capability battery | head -n1`
-	AC_HAL=`hal-find-by-capability --capability ac_adapter`
-	if [ -z $B_HAL -o -z $AC_HAL ]
-	then
-     	    # We do expect a battery & AC
-	    exit 1;
-	fi
+    [ -e /sys/class/power_supply/olpc-battery/capacity \
+	-a -e /sys/class/power_supply/olpc-ac/online ] || return
 
-	B_LEVEL=`hal-get-property --udi $B_HAL --key battery.charge_level.percentage`
-	AC_STAT=`hal-get-property --udi $AC_HAL --key ac_adapter.present`
-
-        # hal reports ac adapter presence as 'true'
-        # ... translate...
-	if [ "$AC_STAT" = 'true' ]
-	then
-	    AC_STAT=1
-	else
-	    AC_STAT=0
-	fi
-    fi
+    # OLPC HW
+    B_LEVEL=$(</sys/class/power_supply/olpc-battery/capacity)
+    AC_STAT=$(</sys/class/power_supply/olpc-ac/online)
 
     # If we are on battery, and below 30%, leave it for later
     if [ $AC_STAT == "0" -a $B_LEVEL -lt 30 ]
