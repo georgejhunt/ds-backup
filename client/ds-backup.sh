@@ -26,7 +26,7 @@
 function skip_noschoolnet {
 
     # no DNS, no XS
-    grep -c '^nameserver ' /etc/resolv.conf 1>&/dev/null || exit
+    grep -q '^nameserver ' /etc/resolv.conf || exit
 
     # In modern Sugar, use the backup_url saved from registration when in an SoaS
     BACKUP_HOST=`gconftool-2  -g /desktop/sugar/backup_url 2>/dev/null | sed 's/^.*@//;s/:.*//'`
@@ -149,9 +149,8 @@ fi
 #  Sleep a random amount, not greater than 20 minutes
 #  We use this to stagger client machines in the 30 minute
 #  slots between cron invocations...
-#  (yes we need all the parenthesys)
 if [ "$1" != "nosleep" ]; then
-    (sleep $(($RANDOM % 1200)));
+    sleep $(($RANDOM % 1200))
 fi
 
 # After the sleep, check again. Perhaps something triggered
@@ -165,12 +164,6 @@ skip_ifrecent;
 # we quit.
 LOCKFILE=~/.sugar/default/lock/ds-backup.run
 
-flock -n $LOCKFILE "$BASEDIR"/ds-backup.py
-EXITCODE=$?
-
+exec flock -n $LOCKFILE "$BASEDIR"/ds-backup.py
 # Note: we keep the lockfile around to save
 # NAND cycles.
-
-# Propagate the exit code of the flock/ds-backup invocation
-exit $EXITCODE
-
