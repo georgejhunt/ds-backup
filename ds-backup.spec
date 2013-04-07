@@ -40,7 +40,7 @@ Summary:        OLPC DS backup & restore server
 Group:          Applications/Archiving
 
 Requires:       xs-config
-Requires:       mod_python
+Requires:       mod_wsgi
 Requires:       python
 Requires:       rsync
 Requires:       vixie-cron

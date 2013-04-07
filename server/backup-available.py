@@ -1,29 +1,37 @@
 # this is not a cgi script
-# will only work as a mod_python handler
+# will only work as a mod_wsgi handler
 
-from mod_python import apache
 import os
 import re
 import pwd
 import random
 
-def handler(req):
+HTTP_OK = 200
+HTTP_SERVICE_UNAVAILABLE = 503
+HTTP_FORBIDDEN = 403
+
+class BackupRefuse(Exception):
+    def __init__(self, status, callback):
+        response_headers = [('Content-type', 'text/plain'),
+                            ('Content-Length', '0')]
+        callback(status, response_headers)
+        return ['']
+        
+def application(environ, callback):
 
     recentclientsdir = '/var/lib/ds-backup/recentclients'
     basehomedir = '/library/users'
 
-    req.content_type= 'text/plain'
-
     # max 5% loadavg
     if (os.getloadavg()[0] > 5):
-        return apache.HTTP_SERVICE_UNAVAILABLE
+        raise(BackupRefuse, HTTP_SERVICE_UNAVAILABLE, callback)
 
     # we need at least a few blocks...
     libstat = os.statvfs(basehomedir);
     usedblockspc = 1 - float(libstat[4])/libstat[2]
     usedfnodespc = 1 - float(libstat[7])/libstat[5]
     if (usedblockspc > 0.9 or usedfnodespc > 0.9):
-        return apache.HTTP_SERVICE_UNAVAILABLE
+        raise(BackupRefuse, HTTP_SERVICE_UNAVAILABLE, callback)
 
     # Limit concurrent rsync clients
     # We touch a file with the client identifier
@@ -34,38 +42,50 @@ def handler(req):
     clientcount = os.system('find ' + recentclientsdir + 
                             ' -mmin -5 -type f | wc -l');
     if (clientcount > 10 ):
-        return apache.HTTP_SERVICE_UNAVAILABLE
+        raise(BackupRefuse, HTTP_SERVICE_UNAVAILABLE, callback)
 
     # Read the XO SN
-    req.add_common_vars()
-    pathinfo = req.subprocess_env['PATH_INFO']
+    pathinfo = environ['PATH_INFO']
+    print("pathinfo:%s"%pathinfo)
     m = re.match('/available/(\w+)$', pathinfo)
     if (m):
         # req.log_error(clientid)
         clientid = m.group(1)
     else:
         # We don't like your SN
-        return apache.HTTP_FORBIDDEN
+        raise(BackupRefuse, HTTP_FORBIDDEN, callback)
     
     # Have we got a user acct for the user?
     try:
         homedir = pwd.getpwnam(clientid)[5]
     except KeyError:
-        return apache.HTTP_FORBIDDEN
+        raise(BackupRefuse, HTTP_FORBIDDEN, callback)
 
     # check the homedir is in the right place
     m = re.match(basehomedir, homedir)
     if (not m):
-        return apache.HTTP_FORBIDDEN
+        raise(BackupRefuse, HTTP_FORBIDDEN, callback)
 
     #return apache.HTTP_UNAUTHORIZED
     #return apache.HTTP_FORBIDDEN
     #return apache.HTTP_VERSION_NOT_SUPPORTED
     #
-    req.write('')
 
     os.system('touch ' + recentclientsdir + '/' + clientid)
     # TODO: 1 in 10, cleanup recentclients dir
     if (random.randint(0,10) == 1):
         os.system('find ' + recentclientsdir + ' -type f -mmin +10 -print0 | xargs -0 -n 100 --no-run-if-empty rm' )
-    return apache.OK
+    
+    response_headers = [('Content-type', 'text/plain'),
+                        ('Content-Length', '0')]
+    status = HTTP_OK
+
+    callback(status, response_headers)
+    return ['']
+def start_response(status,header_info):
+    print("status:%s.  header_info:%r."%(status,header_info,))
+
+    if __name__ == "__main__" :
+        inv_dict = {"PATH_INFO":"available"}
+        application(inv_dict, start_response)    
+
