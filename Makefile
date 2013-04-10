@@ -1,19 +1,39 @@
-# CANONICAL SOURCE OF VERSION STRING:
-VERSION_MAJOR=0
-VERSION_MINOR=15
-PACKAGE=ds-backup
-PKGVER=$(PACKAGE)-$(VERSION_MAJOR).$(VERSION_MINOR)
+NAME=ds-backup
+VERSION = $(shell git describe | sed 's/^v//' | sed 's/-/./g')
+RELEASE = 1
+ARCH = noarch
+BRANCH = $(shell git branch | grep '*' | sed 's/* //')
 
-tarball: $(PKGVER).tar.bz2
+NV = $(NAME)-$(VERSION)
+REL = 1
 
-$(PKGVER).tar.bz2:
-	git diff --shortstat --exit-code # check that our working copy is clean
-	git diff --cached --shortstat --exit-code # uncommitted changes?
-	git archive --format=tar --prefix=$(PKGVER)/ HEAD | bzip2 > $@
-.PHONY: $(PKGVER).tar.bz2 # force refresh
+# rpm target directory
+BUILDDIR = $(HOME)/rpmbuild
+
+SOURCES: Makefile
+	mkdir -p $(BUILDDIR)/BUILD $(BUILDDIR)/RPMS \
+	$(BUILDDIR)/SOURCES $(BUILDDIR)/SPECS $(BUILDDIR)/SRPMS
+	mkdir -p $(NV)
+	git archive --format=tar --prefix="$(NV)/" HEAD > $(NV).tar
+	echo $(VERSION) > $(NV)/build-version
+	tar -rf $(NV).tar $(NV)/build-version
+	#rm -fr $(NV)
+	gzip  $(NV).tar
+	mv $(NV).tar.gz $(BUILDDIR)/SOURCES/
+
+ds-backup.spec: ds-backup.spec.in
+	sed -e 's:@VERSION@:$(VERSION):g' < $< > $@
+
+.PHONY: ds-backup.spec.in
+	# This forces a rebuild of ds-backup.spec.in
+
+RPMBUILD = rpmbuild \
+	--define "_topdir $(BUILDDIR)" \
+
+rpm: SOURCES $(NAME).spec
+	$(RPMBUILD) -ba --target $(ARCH) $(NAME).spec
 
 # install targets
-
 install: install-client install-server
 
 install-client:
