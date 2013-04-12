@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+#updated version
 # Copyright (C) 2007 Ivan Krstić
 # Copyright (C) 2007 Tomeu Vizoso
 # Copyright (C) 2007 One Laptop per Child
@@ -19,13 +20,21 @@
 
 import os, re, sys, tempfile, glob, time
 import urllib2
-from urllib2 import URLError, HTTPError
+from urllib2 import URLError, HTTPError, urlopen
 import subprocess
 from subprocess import Popen, PIPE, call
 
-import logging
 from sugar import env
 from sugar import profile
+
+from sugar.datastore import datastore
+from path import path
+from sftp import sftp
+import datetime
+
+LIMIT = 1024
+WORKPATH = path('/tmp/')
+EXCLUDED = ['org.laptop.Terminal', 'org.laptop.Log']
 
 class BackupError(Exception): pass
 class ProtocolVersionError(BackupError): pass
@@ -49,55 +58,165 @@ def check_server_available(server, xo_serial):
         # print e.reason
         return -1
 
-def rsync_to_xs(paths, backup_host, keyfile, user):
+def sync_time_to_xs():
 
-    # paths is list of tuples (from_path,to_path)
-    for path in paths:
+    xstime = urlopen('http://schoolserver/bibliotheque/school/time')
+    response = xstime.read().replace('\n','')
+    txtout = 'sudo date --set="' + response + '"'
+    print txtout
+    fout = open('/tmp/xstime','w')
+    fout.write(txtout)
+    fout.close()
 
-	to_path = backup_host + ':' + path[1]
-	from_path = path[0]
+def datastore_to_xs():
+    #open log
+    log = open('/tmp/logBackup','w')
+    #get journal records
+    query = {}
+    keys = ['uid','activity','title','title_set_by_user','mime_type','journal','keep']
+    ds_objects,num_objects = datastore.find(query,properties=keys)
+    print >> log, 'num_objects',num_objects
+    #process each one
+    for i in range(num_objects):
+        ds_object = ds_objects[i]
+        #is it in the journal
+        try:
+            journal = ds_object.metadata['journal']
+        except:
+            print >> log,sys.exc_info()[:2]
+            #new record created since last run of ds-backup
+            #is it a journal record? (title_set_by_user == 1 and has_file_path)
+            print >> log, i, 'new record'
+            activity = ds_object.metadata['activity']
+            if activity in EXCLUDED:
+                jr = False
+                print >> log, 'activity',activity,'excluded'
+            else:
+                jr = True
+            title_set_by_user = ds_object.metadata['title_set_by_user']
+            file_path = ds_object.get_file_path()
+            jobject = datastore.get(ds_object.object_id)
+            metadata = {}
+            for key in jobject.metadata.keys():
+                if not key == 'preview':
+                    metadata[key] = jobject.metadata[key]
+            metadata_path = WORKPATH+path(file_path).namebase+'.metadata'
+            fout = open(metadata_path,'w')
+            fout.write(str(metadata))
+            fout.close()
+            if path(file_path).exists() and title_set_by_user == '1' and jr:
+                #journal record
+                print >>log, 'journal record',file_path
+                try:
+                    ds_object.metadata['journal'] = 1
+                except:
+                    print >> log, 'create journal key failed',sys.exc_info()[:2]
+                ds_object.metadata['keep'] = 1
+                script = 'cd journal\nput '+ metadata_path+'\nput '+file_path+'\n'
+                result,err = sftp(script,WORKPATH)
+                if err:
+                    print >> log, script, 'err', err
+                print >> log, ds_object.metadata['title'],'added to Journal',
+                print >> log, 'keep', ds_object.metadata['keep']
+                datastore.write(ds_object)
+            else:
+                #log record
+                print >> log, 'log record'
+                script = 'cd log\nput '+metadata_path+'\n'
+                result,err = sftp(script,WORKPATH)
+       	       	if err:
+       	       	    print >> log, script, 'err', err
+                else: 
+                    try:
+                        datastore.delete(ds_object.object_id)
+                    except:
+                        pass
+            subprocess.call('rm -rf ' + WORKPATH / '*.metadata',shell=True)
+        else:
+            #journal record
+            file_path = ds_object.get_file_path()
+            fn = path(file_path).name
+            try:
+                testjournal = ds_object.metadata['journal']
+            except:
+                testjournal = 'key error'
+            try:
+                testkeep = ds_object.metadata['keep']
+            except:
+                testkeep = 'key error'
+            print >> log, i, 'existing journal record', fn, 
+            print >> log, 'journal',testjournal,
+            print >> log, 'keep',testkeep
+            if journal == 2:
+                print >> log, 'delete requested'
+                #delete it from ss
+                file_path = ds_object.get_filepath
+                fn = path(file_path).name
+                script = 'cd journal\nrm -rf ' + fn + '*'
+                result,err = sftp(script)
+       	       	if result:
+       	       	    print >> log, 'result',script,result
+       	       	if err:
+       	       	    print >> log, 'err',script,err 
+                #delete locally
+                try:
+                    datastore.delete(ds_object.object_id)
+                except:
+                    pass
+            else:
+                try:
+                    keep = ds_object.metadata['keep']
+                except:
+                    keep = 'key error'
+                try:
+                    journal = ds_object.metadata['journal']
+                except:
+                    journal = 'key error'
+                print >> log, 'journal record: keep', keep, 'journal', journal
+                if keep == 0 and journal == 1:
+                    #delete local data
+                    print >> log, 'deleting local data'
+                    dsobject.file_path = None
+                    dsobject.metadata['journal'] = 0
+                    datastore.write(ds_object)
+                if keep == 1 and journal == 0:
+                    #get local copy of data from ss
+                    print >> log, 'getting local copy of data from ss'
+                    script = 'cd journal\nget '+fn
+                    result,err=sftp(script,WORKPATH)
+       	       	    if result:
+       	       	        print >> log, 'result', script, result
+       	       	    if err:
+       	       	        print >> log, 'err',script,err 
+                    dsobject.file_path = path('/tmp') / fn
+                    dsobject.metadata['journal'] = 1
+                    datastore.write(ds_object)
+    #log version
+    pth = path('/home/olpc/.sugar/default/patch')
+    if pth.exists():
+        fin = open(pth,'r')
+        version = fin.read()
+        fin.close()
+        metadata = {}
+        metadata['mtime'] = datetime.date
+        metadata['title'] = 'version'
+        metadata['title_set_by_user'] = 1
+        metadata['version'] = version
+        metadata_path = WORKPATH+path(file_path).namebase+'.metadata'
+        fout = open(metadata_path,'w')
+        fout.write(str(metadata))
+        fout.close()
+        script = 'cd log\nput '+metadata_path+'\n'
+        result,err = sftp(script,WORKPATH)
+        if err:
+            print >> log, script, 'err', err
+        else:
+            try:
+                datastore.delete(ds_object.object_id)
+            except:
+                pass
+    log.close()
 
-	# add a trailing slash to ensure
-	# that we don't generate a subdir
-	# at the remote end. rsync oddities...
-	if not re.compile('/$').search(from_path):
-	    from_path = from_path + '/'
-
-	ssh_shellcmd = '/usr/bin/ssh -F /dev/null -o "PasswordAuthentication no" -o "StrictHostKeyChecking no" -i "%s" -l "%s"' \
-	    % (keyfile, user)
-	rsync_cmd = ['/usr/bin/rsync', '-z', '-rlt', '--partial',
-		'--delete', '--timeout=160',
-		'-e', ssh_shellcmd, from_path, to_path]
-	#print rsync_cmd
-
-	rsync_exit = call(rsync_cmd)
-
-	# TODO: we could track progress with a
-	# for line in pipe:
-	# (an earlier version had it)
-
-	if rsync_exit != 0:
-	    # TODO: retry a couple of times
-	    # if rsync_exit is 30 (Timeout in data send/receive)
-	    raise TransferError('rsync error code %s : cmd = "%s"'
-				% (rsync_exit,rsync_cmd) )
-
-    # Transfer an empty file marking completion
-    # so the XS can see we are done.
-    # Note: the dest dir on the XS is watched via
-    # inotify - so we avoid creating tempfiles there.
-    tmpfile = tempfile.mkstemp()
-    rsync_cmd = ['/usr/bin/rsync', '-z',
-                 '-rlt', '--timeout', '10',
-                 '-T', '/tmp', '-e', ssh_shellcmd,
-                 tmpfile[1],
-                 backup_host + ':/var/lib/ds-backup/completion/'+user]
-    rsync_exit = call(rsync_cmd)
-    if rsync_exit != 0:
-        # TODO: retry a couple of times
-        # if rsync_exit is 30 (Timeout in data send/receive)
-        raise TransferError('rsync error code %s.'
-                            % rsync_exit)
 
 def get_sn():
     if have_ofw_tree():
@@ -156,113 +275,15 @@ def identifier_get_string(key):
         return ''
 
 def have_ofw_tree():
-    return os.path.exists('/proc/device-tree') or os.path.exists('/ofw')
+    return os.path.exists('/ofw')
 
-def read_ofw(node):
-    for prefix in ('/proc/device-tree', '/ofw'):
-        path = os.path.join(prefix, node)
-        if os.path.exists(path):
-            fh = open(path, 'r')
-            data = fh.read().rstrip('\0\n')
-            fh.close()
-            return data
-    return None
+def read_ofw(path):
+    path = os.path.join('/ofw', path)
+    if not os.path.exists(path):
+        return None
+    fh = open(path, 'r')
+    data = fh.read().rstrip('\0\n')
+    fh.close()
+    return data
 
-def get_documents_path():
-    """Gets the path of the DOCUMENTS folder
-
-    If xdg-user-dir can not find the DOCUMENTS folder it returns
-    $HOME, which we omit. xdg-user-dir handles localization
-    (i.e. translation) of the filenames.
-
-    Returns: Path to $HOME/DOCUMENTS or None if an error occurs
-    """
-    try:
-        pipe = subprocess.Popen(['xdg-user-dir', 'DOCUMENTS'],
-                                stdout=subprocess.PIPE)
-        documents_path = os.path.normpath(pipe.communicate()[0].strip())
-        if os.path.exists(documents_path) and \
-                os.environ.get('HOME') != documents_path:
-            return documents_path
-    except OSError, exception:
-        if exception.errno != errno.ENOENT:
-            logging.exception('Could not run xdg-user-dir')
-    return None
-
-# if run directly as script
-if __name__ == "__main__":
-
-    backup_host = '' # host
-    backup_url = ''  # target rsync url - set at reg time
-    backup_ctrl_url = '' # http address for control proto
-
-    ## idmgr (on XS 0.6 and earlier)
-    ## sets backup_url at regtime to
-    ## username@fqdn:backup - but expects the
-    ## rsync cmd to go to username@fqdn:datastore-current
-    ## -- so we only read the FQDN from the value.
-
-    backup_url = get_backup_url()
-
-    if not backup_url:
-        # not registered, nothing to do!
-        # (normally caught in ds-backup.sh)
-        exit(0)
-
-    # matches the host part in
-    # - user@host:path
-    # - host:path
-    m = re.match('(\w+\@)?(\w|.+?):', backup_url)
-    if not m or not m.group(2):
-        sys.stderr.write("Cannot extract backup host from %s\n" % backup_url)
-        exit(1)
-    backup_host = m.group(2)
-
-    backup_ctrl_url = 'http://' + backup_host + '/backup/1'
-
-    sn = get_sn()
-
-    ds_path = env.get_profile_path('datastore')
-    pk_path = os.path.join(env.get_profile_path(), 'owner.key')
-
-    # Check backup server availability.
-    # On 503 ("too busy") apply exponential back-off
-    # over 10 attempts. Combined with the staggered sleep
-    # in ds-backup.sh, this should keep thundering herds
-    # under control. We are also holding a flock to prevent
-    # local races.
-    # With range(1,7) we sleep up to 64 minutes.
-
-    # Get the documents path in a localization independent way
-    documents_path = get_documents_path()
-    home_path = os.path.expanduser('~')
-
-    # Make sure home_path ends in a /
-    if not re.compile('/$').search(home_path):
-	    home_path += '/'
-
-    backup_paths = [ (ds_path,'datastore-current'), (home_path+'power-logs','power-logs') ]
-
-    # Keep the server side of the documents dir called 'documents' so its standardized
-    # the client should know what its documents dir is localized to
-    if documents_path:
-	backup_paths.append( (documents_path,'documents') )
-
-    for n in range(1,7):
-        sstatus = check_server_available(backup_ctrl_url, sn)
-        if (sstatus == 200):
-            # cleared to run
-            rsync_to_xs(backup_paths, backup_host, pk_path, sn)
-            # this marks success to the controlling script...
-            os.system('touch ~/.sugar/default/ds-backup-done')
-            exit(0)
-        elif (sstatus == 503):
-            # exponenxtial backoff
-            time.sleep(60 * 2**n)
-        elif (sstatus == -1):
-            # could not connect - XS is not there
-            exit(1)
-        else:
-            # 500, 404, 403, or other unexpected value
-            exit(sstatus)
 
