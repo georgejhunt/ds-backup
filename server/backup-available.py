@@ -29,21 +29,16 @@ class Debugger:
             debugger.quitting = 1
             sys.settrace(None)
 
-def refuse(status, callback):
+def application(environ, __response_headers):
     response_headers = [('Content-type', 'text/plain'),
-                            ('Content-Length', '0')]
-    print("returning a backup refusal, status:%s"%(status,))
-    callback(status, response_headers)
-    return ['']
-
-def application(environ, callback):
+                        ('Content-Length', '0')]
 
     recentclientsdir = '/var/lib/ds-backup/recentclients'
     basehomedir = '/library/users'
 
     # max 5% loadavg
     if (os.getloadavg()[0] > 5):
-        refuse(HTTP_SERVICE_UNAVAILABLE, callback)
+        __callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
         return ['']
 
     # we need at least a few blocks...
@@ -51,7 +46,7 @@ def application(environ, callback):
     usedblockspc = 1 - float(libstat[4])/libstat[2]
     usedfnodespc = 1 - float(libstat[7])/libstat[5]
     if (usedblockspc > 0.9 or usedfnodespc > 0.9):
-        refuse(HTTP_SERVICE_UNAVAILABLE, callback)
+        __callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
         return ['']
 
     # Limit concurrent rsync clients
@@ -63,7 +58,7 @@ def application(environ, callback):
     clientcount = os.system('find ' + recentclientsdir +
                             ' -mmin -5 -type f | wc -l');
     if (clientcount > 10 ):
-        refuse(HTTP_SERVICE_UNAVAILABLE, callback)
+        __callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
         return ['']
 
     # Read the XO SN
@@ -75,19 +70,19 @@ def application(environ, callback):
         clientid = m.group(1)
     else:
         # We don't like your SN
-        refuse(HTTP_FORBIDDEN, callback)
+        __callback(HTTP_FORBIDDEN, response_headers)
         return ['']
 
     # Have we got a user acct for the user?
     try:
         homedir = pwd.getpwnam(clientid)[5]
     except KeyError:
-        refuse(HTTP_FORBIDDEN, callback)
+        __callback(HTTP_FORBIDDEN, response_headers)
 
     # check the homedir is in the right place
     m = re.match(basehomedir, homedir)
     if (not m):
-        refuse(HTTP_FORBIDDEN, callback)
+        __callback(HTTP_FORBIDDEN, response_headers)
         return ['']
 
     #return apache.HTTP_UNAUTHORIZED
@@ -100,8 +95,6 @@ def application(environ, callback):
     if (random.randint(0,10) == 1):
         os.system('find ' + recentclientsdir + ' -type f -mmin +10 -print0 | xargs -0 -n 100 --no-run-if-empty rm' )
 
-    response_headers = [('Content-type', 'text/plain'),
-                        ('Content-Length', '0')]
     status = HTTP_OK
     print("status return:%s"%status)
     callback(status, response_headers)
