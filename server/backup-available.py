@@ -6,17 +6,36 @@ import re
 import pwd
 import random
 
-HTTP_OK = 200
-HTTP_SERVICE_UNAVAILABLE = 503
-HTTP_FORBIDDEN = 403
+HTTP_OK = "200 OK"
+HTTP_SERVICE_UNAVAILABLE = "503 SERVICE_UNAVAILABLE"
+HTTP_FORBIDDEN = "403 FORBIDDEN"
 
-class BackupRefuse(Exception):
-    def __init__(self, status, callback):
-        response_headers = [('Content-type', 'text/plain'),
+class Debugger:
+
+    def __init__(self, object):
+        self.__object = object
+        print("got to debugger class")
+
+    def __call__(self, *args, **kwargs):
+        import pdb, sys
+        debugger = pdb.Pdb()
+        debugger.use_rawinput = 0
+        debugger.reset()
+        sys.settrace(debugger.trace_dispatch)
+
+        try:
+            return self.__object(*args, **kwargs)
+        finally:
+            debugger.quitting = 1
+            sys.settrace(None)
+
+def refuse(status, callback):
+    response_headers = [('Content-type', 'text/plain'),
                             ('Content-Length', '0')]
-        callback(status, response_headers)
-        return ['']
-        
+    print("returning a backup refusal, status:%s"%(status,))
+    callback(status, response_headers)
+    return ['']
+
 def application(environ, callback):
 
     recentclientsdir = '/var/lib/ds-backup/recentclients'
@@ -24,14 +43,16 @@ def application(environ, callback):
 
     # max 5% loadavg
     if (os.getloadavg()[0] > 5):
-        raise(BackupRefuse, HTTP_SERVICE_UNAVAILABLE, callback)
+        refuse(HTTP_SERVICE_UNAVAILABLE, callback)
+        return ['']
 
     # we need at least a few blocks...
     libstat = os.statvfs(basehomedir);
     usedblockspc = 1 - float(libstat[4])/libstat[2]
     usedfnodespc = 1 - float(libstat[7])/libstat[5]
     if (usedblockspc > 0.9 or usedfnodespc > 0.9):
-        raise(BackupRefuse, HTTP_SERVICE_UNAVAILABLE, callback)
+        refuse(HTTP_SERVICE_UNAVAILABLE, callback)
+        return ['']
 
     # Limit concurrent rsync clients
     # We touch a file with the client identifier
@@ -39,10 +60,11 @@ def application(environ, callback):
     # we can check for recent "OKs".
     # (clients that retry the rsync transfer won't
     #  re-request this url, anyway.)
-    clientcount = os.system('find ' + recentclientsdir + 
+    clientcount = os.system('find ' + recentclientsdir +
                             ' -mmin -5 -type f | wc -l');
     if (clientcount > 10 ):
-        raise(BackupRefuse, HTTP_SERVICE_UNAVAILABLE, callback)
+        refuse(HTTP_SERVICE_UNAVAILABLE, callback)
+        return ['']
 
     # Read the XO SN
     pathinfo = environ['PATH_INFO']
@@ -53,18 +75,20 @@ def application(environ, callback):
         clientid = m.group(1)
     else:
         # We don't like your SN
-        raise(BackupRefuse, HTTP_FORBIDDEN, callback)
-    
+        refuse(HTTP_FORBIDDEN, callback)
+        return ['']
+
     # Have we got a user acct for the user?
     try:
         homedir = pwd.getpwnam(clientid)[5]
     except KeyError:
-        raise(BackupRefuse, HTTP_FORBIDDEN, callback)
+        refuse(HTTP_FORBIDDEN, callback)
 
     # check the homedir is in the right place
     m = re.match(basehomedir, homedir)
     if (not m):
-        raise(BackupRefuse, HTTP_FORBIDDEN, callback)
+        refuse(HTTP_FORBIDDEN, callback)
+        return ['']
 
     #return apache.HTTP_UNAUTHORIZED
     #return apache.HTTP_FORBIDDEN
@@ -75,17 +99,17 @@ def application(environ, callback):
     # TODO: 1 in 10, cleanup recentclients dir
     if (random.randint(0,10) == 1):
         os.system('find ' + recentclientsdir + ' -type f -mmin +10 -print0 | xargs -0 -n 100 --no-run-if-empty rm' )
-    
+
     response_headers = [('Content-type', 'text/plain'),
                         ('Content-Length', '0')]
     status = HTTP_OK
-
+    print("status return:%s"%status)
     callback(status, response_headers)
     return ['']
-def start_response(status,header_info):
-    print("status:%s.  header_info:%r."%(status,header_info,))
 
-    if __name__ == "__main__" :
-        inv_dict = {"PATH_INFO":"available"}
-        application(inv_dict, start_response)    
-
+# to debug this wsgi stub, uncomment the following and run "httpd -X" at the server
+#application = Debugger(application)
+if __name__ == "__main__" :
+    #inv_dict = {"PATH_INFO":"available"}
+    #application(inv_dict, start_response)
+    pass
