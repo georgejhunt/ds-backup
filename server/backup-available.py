@@ -29,7 +29,7 @@ class Debugger:
             debugger.quitting = 1
             sys.settrace(None)
 
-def application(environ, __response_headers):
+def application(environ, __callback):
     response_headers = [('Content-type', 'text/plain'),
                         ('Content-Length', '0')]
 
@@ -97,7 +97,7 @@ def application(environ, __response_headers):
 
     status = HTTP_OK
     print("status return:%s"%status)
-    callback(status, response_headers)
+    __callback(status, response_headers)
     return ['']
 
 # to debug this wsgi stub, uncomment the following and run "httpd -X" at the server

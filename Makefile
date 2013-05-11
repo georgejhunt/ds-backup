@@ -17,7 +17,7 @@ SOURCES: Makefile
 	git archive --format=tar --prefix="$(NV)/" HEAD > $(NV).tar
 	echo $(VERSION) > $(NV)/build-version
 	tar -rf $(NV).tar $(NV)/build-version
-	#rm -fr $(NV)
+	rm -fr $(NV)
 	gzip  $(NV).tar
 	mv $(NV).tar.gz $(BUILDDIR)/SOURCES/
 
