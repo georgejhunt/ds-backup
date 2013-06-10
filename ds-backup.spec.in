@@ -47,11 +47,11 @@ Requires:       xs-config
 Requires:       mod_wsgi
 Requires:       python
 Requires:       rsync
-Requires:       vixie-cron
+Requires:       cronie
 Requires:       incron
 Requires:       php
 Requires:       httpd
-Requires:       syck-python
+Requires:       PyYAML
 
 %description client
 ds-backup-client is a GPL-licensed collection of scripts for backing up and
@@ -108,6 +108,9 @@ service httpd condrestart
 %attr(777, nobody, nobody) %dir %{_localstatedir}/lib/ds-backup/completion
 
 %changelog
+* Mon Jun 10 2013 George Hunt <georgejhunt@gmail.com 
+- changed dependencies on syck-python=>PyYAML, and vixie-cron=>cronie
+
 * Fri Jul 18 2008 Martin Langhoff <martin@laptop.org - 0.7-1.olpc3
 - Updated server package, several fixes.
 - Fixed dependencies: cronie->vixie-cron (which cronie provides on F9)

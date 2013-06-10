@@ -39,7 +39,7 @@ DS_SOFT_QUOTA=70
 #
 #
 
-import syck
+import yaml
 import os
 import sys
 import subprocess
@@ -55,7 +55,7 @@ if (os.getloadavg()[0] > 5):
 
 if os.path.exists('/etc/xs-quotas.conf'):
     #qf = file('/etc/xs-quotas.conf', 'r')
-    quotaconf = syck.load(open('/etc/xs-quotas.conf', 'r').read());
+    quotaconf = yaml.load(open('/etc/xs-quotas.conf', 'r').read());
     if (quotaconf.has_key('ds-backup')):
         quotaconf['ds-backup'] = int(quotaconf['ds-backup'])
         if (quotaconf['ds-backup'] < 100):
