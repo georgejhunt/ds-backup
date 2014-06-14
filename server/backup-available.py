@@ -29,7 +29,7 @@ class Debugger:
             debugger.quitting = 1
             sys.settrace(None)
 
-def application(environ, __callback):
+def application(environ, callback):
     response_headers = [('Content-type', 'text/plain'),
                         ('Content-Length', '0')]
 
@@ -38,7 +38,7 @@ def application(environ, __callback):
 
     # max 5% loadavg
     if (os.getloadavg()[0] > 5):
-        __callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
+        callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
         return ['']
 
     # we need at least a few blocks...
@@ -46,7 +46,7 @@ def application(environ, __callback):
     usedblockspc = 1 - float(libstat[4])/libstat[2]
     usedfnodespc = 1 - float(libstat[7])/libstat[5]
     if (usedblockspc > 0.9 or usedfnodespc > 0.9):
-        __callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
+        callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
         return ['']
 
     # Limit concurrent rsync clients
@@ -58,7 +58,7 @@ def application(environ, __callback):
     clientcount = os.system('find ' + recentclientsdir +
                             ' -mmin -5 -type f | wc -l');
     if (clientcount > 10 ):
-        __callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
+        callback(HTTP_SERVICE_UNAVAILABLE, response_headers)
         return ['']
 
     # Read the XO SN
@@ -70,19 +70,19 @@ def application(environ, __callback):
         clientid = m.group(1)
     else:
         # We don't like your SN
-        __callback(HTTP_FORBIDDEN, response_headers)
+        callback(HTTP_FORBIDDEN, response_headers)
         return ['']
 
     # Have we got a user acct for the user?
     try:
         homedir = pwd.getpwnam(clientid)[5]
     except KeyError:
-        __callback(HTTP_FORBIDDEN, response_headers)
+        callback(HTTP_FORBIDDEN, response_headers)
 
     # check the homedir is in the right place
     m = re.match(basehomedir, homedir)
     if (not m):
-        __callback(HTTP_FORBIDDEN, response_headers)
+        callback(HTTP_FORBIDDEN, response_headers)
         return ['']
 
     #return apache.HTTP_UNAUTHORIZED
@@ -97,7 +97,7 @@ def application(environ, __callback):
 
     status = HTTP_OK
     print("status return:%s"%status)
-    __callback(status, response_headers)
+    callback(status, response_headers)
     return ['']
 
 # to debug this wsgi stub, uncomment the following and run "httpd -X" at the server
